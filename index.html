@@ -1,0 +1,2207 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Wild Survival</title>
+<style>
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { margin: 0; height: 100%; overflow: hidden; background: #0b1420; font-family: system-ui, Arial, sans-serif;
+    touch-action: none; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none; }
+  canvas { display: block; width: 100%; height: 100%; }
+  button { font-family: inherit; }
+
+  #hud { position: fixed; top: 10px; left: 10px; color: #fff; pointer-events: none; text-shadow: 0 1px 3px #000; font-size: 13px; }
+  .bar { width: 160px; height: 14px; background: rgba(0,0,0,.5); border: 1px solid rgba(255,255,255,.4); margin-bottom: 5px; border-radius: 3px; overflow: hidden; position: relative; }
+  .bar > div { height: 100%; }
+  .bar > span { position: absolute; left: 6px; top: -1px; font-size: 11px; line-height: 14px; }
+  #hp { background: #d33; } #food { background: #e8962e; }
+  #cross { position: fixed; left: 50%; top: 50%; width: 6px; height: 6px; margin: -3px; border-radius: 50%;
+    background: rgba(255,255,255,.85); box-shadow: 0 0 3px #000; pointer-events: none; }
+  #prompt { position: fixed; left: 50%; top: calc(50% + 26px); transform: translateX(-50%); color: #fff; font-size: 15px;
+    text-shadow: 0 1px 3px #000; pointer-events: none; text-align: center; max-width: 90vw; line-height: 1.35; }
+  #prompt .bad { color: #ff8a80; } #prompt .ok { color: #9dff9d; } #prompt small { opacity: .85; font-size: 12px; }
+  #toasts { position: fixed; left: 50%; top: 24%; transform: translateX(-50%); pointer-events: none; text-align: center; }
+  .toast { color: #ffe27a; font-weight: 700; font-size: 19px; text-shadow: 0 2px 4px #000; animation: up 1.4s forwards; }
+  @keyframes up { 0% { opacity: 1; transform: translateY(0); } 70% { opacity: 1; } 100% { opacity: 0; transform: translateY(-36px); } }
+
+  /* Пояс (хотбар) и слоты */
+  #hotbar { position: fixed; left: 50%; bottom: 14px; transform: translateX(-50%); display: flex; gap: 6px; z-index: 12; }
+  .slot { width: 58px; height: 58px; position: relative; background: rgba(25,28,32,.78); border: 2px solid rgba(255,255,255,.22);
+    border-radius: 4px; cursor: pointer; }
+  .slot.sel { border-color: #8fd0ff; box-shadow: 0 0 8px #5ab4ff; }
+  .slot.held { outline: 2px dashed #ffd24a; }
+  .slot svg { position: absolute; left: 6px; top: 6px; width: calc(100% - 12px); height: calc(100% - 12px); pointer-events: none; }
+  .slot .n { position: absolute; right: 4px; bottom: 2px; font-size: 12px; font-weight: 700; color: #fff; text-shadow: 0 1px 2px #000; pointer-events: none; }
+  .slot .k { position: absolute; left: 4px; top: 1px; font-size: 10px; color: #cfd8e0; pointer-events: none; }
+  #miniQ { position: fixed; left: 50%; bottom: 82px; transform: translateX(-50%); color: #fff; font-size: 12px; text-shadow: 0 1px 2px #000;
+    display: none; text-align: center; pointer-events: none; z-index: 12; }
+  #miniQ .qb { width: 180px; height: 6px; background: rgba(0,0,0,.6); margin: 3px auto 0; border-radius: 3px; overflow: hidden; }
+  #miniQ .qb div { height: 100%; background: #8fd0ff; }
+
+  /* План строительства */
+  #buildPanel { position: fixed; left: 10px; top: 50%; transform: translateY(-50%); background: rgba(20,24,28,.82); color: #fff;
+    border: 1px solid rgba(255,255,255,.25); border-radius: 6px; padding: 8px; display: none; z-index: 8; min-width: 160px; }
+  #buildPanel .bt { font-size: 11px; letter-spacing: 1px; color: #9fd0ff; margin-bottom: 6px; }
+  #buildPanel .bp { padding: 7px 8px; font-size: 14px; border-radius: 4px; cursor: pointer; border: 1px solid transparent; }
+  #buildPanel .bp.on { background: rgba(90,180,255,.25); border-color: #8fd0ff; }
+  #buildPanel .bp small { float: right; opacity: .7; margin-left: 10px; }
+  #buildPanel .bh { font-size: 11px; opacity: .7; margin-top: 6px; }
+
+  /* Инвентарь / крафт */
+  #invScreen { position: fixed; inset: 0; z-index: 11; display: none; align-items: center; justify-content: center; gap: 16px;
+    background: rgba(0,0,0,.5); flex-wrap: wrap; overflow: auto; padding: 10px 10px 100px; touch-action: pan-y; }
+  .panel { background: rgba(20,24,28,.94); border: 1px solid rgba(255,255,255,.2); border-radius: 6px; padding: 12px; color: #fff; position: relative; }
+  .panel h2 { margin: 0 0 10px; font-size: 15px; letter-spacing: 1px; color: #9fd0ff; }
+  #bag { display: grid; grid-template-columns: repeat(6, 58px); gap: 6px; }
+  #invHelp { font-size: 12px; opacity: .7; margin-top: 10px; max-width: 380px; line-height: 1.4; }
+  #craftPanel { display: none; width: 440px; max-width: 96vw; }
+  #invScreen.craft #craftPanel { display: block; }
+  #closeBtn { position: absolute; right: 8px; top: 6px; background: rgba(255,255,255,.12); color: #fff; border: 1px solid rgba(255,255,255,.3);
+    border-radius: 4px; font-size: 14px; padding: 4px 10px; cursor: pointer; }
+  .tabs { display: flex; gap: 6px; margin-bottom: 8px; flex-wrap: wrap; }
+  .tab { background: rgba(255,255,255,.08); color: #fff; border: 1px solid rgba(255,255,255,.2); border-radius: 4px; padding: 5px 10px; cursor: pointer; font-size: 13px; }
+  .tab.on { background: rgba(90,180,255,.3); border-color: #8fd0ff; }
+  .rlist { display: flex; flex-wrap: wrap; gap: 6px; max-height: 150px; overflow-y: auto; touch-action: pan-y; margin-bottom: 8px; }
+  .rrow { width: 94px; padding: 6px 4px; text-align: center; border: 1px solid rgba(255,255,255,.2); border-radius: 4px; cursor: pointer; background: rgba(255,255,255,.05); }
+  .rrow.on { border-color: #8fd0ff; background: rgba(90,180,255,.2); }
+  .rrow.dim { opacity: .55; }
+  .rrow .ri { width: 40px; height: 40px; margin: 0 auto 3px; } .rrow .ri svg { width: 100%; height: 100%; }
+  .rrow .rn { font-size: 11px; line-height: 1.15; }
+  .rdet { border-top: 1px solid rgba(255,255,255,.15); padding-top: 8px; }
+  .rt { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
+  .rd { font-size: 12px; opacity: .8; margin-bottom: 6px; line-height: 1.35; }
+  .rc { margin-bottom: 4px; } .cost { display: inline-flex; align-items: center; margin-right: 12px; font-size: 14px; }
+  .cost.bad { color: #ff8a80; } .ci { display: inline-block; width: 22px; height: 22px; margin-right: 4px; } .ci svg { width: 100%; height: 100%; }
+  .rm { font-size: 12px; opacity: .75; margin-bottom: 8px; }
+  .cbtn { background: #2e7d32; color: #fff; border: 0; border-radius: 4px; padding: 9px 18px; font-size: 14px; font-weight: 700; cursor: pointer; }
+  .cbtn:disabled { background: #444; color: #999; cursor: default; }
+  .rq { border-top: 1px solid rgba(255,255,255,.15); margin-top: 10px; padding-top: 8px; }
+  .qrow { display: flex; align-items: center; gap: 6px; font-size: 13px; margin-bottom: 4px; }
+  .qrow .qbar { flex: 1; height: 8px; background: rgba(0,0,0,.6); border-radius: 3px; overflow: hidden; }
+  .qrow .qfill { height: 100%; background: #8fd0ff; }
+  .qx { background: #7a2a2a; color: #fff; border: 0; border-radius: 3px; width: 24px; height: 24px; cursor: pointer; }
+
+  #overlay { position: fixed; inset: 0; background: rgba(0,0,0,.72); color: #fff; display: flex; flex-direction: column;
+    align-items: center; justify-content: center; text-align: center; padding: 20px; z-index: 20; cursor: pointer; }
+  #overlay h1 { margin: 0 0 12px; font-size: 34px; }
+  #overlay p { margin: 4px 0; opacity: .92; line-height: 1.5; max-width: 720px; }
+  #msg { margin-top: 16px !important; font-size: 18px; word-break: break-word; }
+  #msg.err { color: #ff8a80; }
+  #playBtn { display: none; margin-top: 18px !important; font-size: 22px; font-weight: 700; }
+
+  #touch { display: none; }
+  body.mobile #touch { display: block; }
+  #joyBase { position: fixed; left: 28px; bottom: 28px; width: 130px; height: 130px; border-radius: 50%;
+    background: rgba(255,255,255,.15); border: 2px solid rgba(255,255,255,.45); z-index: 5; }
+  #joyKnob { position: absolute; left: 50%; top: 50%; width: 56px; height: 56px; margin: -28px 0 0 -28px; border-radius: 50%;
+    background: rgba(255,255,255,.5); border: 2px solid rgba(255,255,255,.8); }
+  .btn { position: fixed; border-radius: 50%; background: rgba(255,255,255,.2); border: 2px solid rgba(255,255,255,.6); z-index: 5;
+    color: #fff; display: flex; align-items: center; justify-content: center; font-weight: 700; text-align: center; line-height: 1.1; }
+  .btn.active { background: rgba(255,255,255,.5); }
+  #btnAct { right: 28px; bottom: 36px; width: 96px; height: 96px; font-size: 13px; }
+  #btnJump { right: 140px; bottom: 28px; width: 66px; height: 66px; font-size: 11px; }
+  #side { position: fixed; right: 12px; top: 64px; display: grid; grid-template-columns: repeat(2, 54px); gap: 6px; z-index: 5; }
+  .btn.sm { position: static; width: 54px; height: 54px; font-size: 10px; }
+  .btn.plan, .btn.hammer { display: none; }
+  body.hold-plan .btn.plan { display: flex; } body.hold-hammer .btn.hammer { display: flex; }
+  @media (orientation: portrait) { body.mobile #hotbar { bottom: 178px; } body.mobile #miniQ { bottom: 246px; } }
+  body.mobile .slot { width: 46px; height: 46px; } body.mobile #hotbar { gap: 4px; }
+  #dead { position: fixed; inset: 0; background: rgba(120,0,0,.6); color: #fff; display: none; align-items: center;
+    justify-content: center; font-size: 36px; font-weight: 700; z-index: 9; }
+  #memeBig { position: fixed; top: 13%; left: 50%; transform: translateX(-50%); z-index: 14; pointer-events: none; opacity: 0;
+    font-family: Impact, 'Arial Black', system-ui, sans-serif; font-size: clamp(22px, 5.4vw, 48px); font-weight: 900; text-transform: uppercase; text-align: center;
+    color: #fff; -webkit-text-stroke: 2px #000; paint-order: stroke fill; text-shadow: 0 3px 0 #000, 0 0 12px rgba(0,0,0,.6); max-width: 92vw; line-height: 1.1; }
+  #memeBig.show { animation: memePop 2.8s ease-out forwards; }
+  @keyframes memePop { 0% { opacity: 0; transform: translateX(-50%) scale(.4) rotate(-6deg); } 10% { opacity: 1; transform: translateX(-50%) scale(1.15) rotate(2deg); }
+    18% { transform: translateX(-50%) scale(1) rotate(-1deg); } 80% { opacity: 1; } 100% { opacity: 0; transform: translateX(-50%) scale(1) rotate(0); } }
+  #hurt { position: fixed; inset: 0; pointer-events: none; opacity: 0; z-index: 13; background: radial-gradient(ellipse at center, rgba(0,0,0,0) 45%, rgba(190,0,0,.85) 100%); }
+  #dead { text-align: center; }
+  #deadSub { font-size: 20px; margin-top: 10px; font-weight: 600; opacity: .95; }
+  #resetSave { background: rgba(255,255,255,.1); color: #fff; border: 1px solid rgba(255,255,255,.35); border-radius: 4px; padding: 6px 12px; font-size: 12px; cursor: pointer; margin-top: 10px; }
+
+  #charPanel{position:fixed;left:14px;top:100px;width:132px;z-index:12;display:none;pointer-events:none;text-align:center;color:#fff;
+    background:rgba(20,24,28,.72);border:1px solid rgba(255,255,255,.25);border-radius:8px;padding:8px 6px;text-shadow:0 1px 2px #000;}
+  #charPanel svg{width:100%;height:auto;display:block}
+  #charPanel .cl{font-size:12px;margin-top:4px;opacity:.95}
+  @keyframes pick{0%,100%{transform:rotate(0)}50%{transform:rotate(-30deg)}}
+  #charPanel .arm{transform-origin:87px 46px;animation:pick .55s infinite}
+  #overlay{align-items:flex-start;justify-content:center;text-align:left;cursor:default;padding:0 6vw;overflow:auto;
+    background:linear-gradient(90deg,rgba(8,12,16,.96) 0%,rgba(8,12,16,.82) 45%,rgba(8,12,16,.35) 100%);}
+  #menuBox{max-width:470px;width:100%;padding:20px 0}
+  #overlay h1{font-size:46px;letter-spacing:3px;margin:0;color:#e8e2d0}
+  .sub{color:#c8442b;letter-spacing:4px;font-size:12px;margin:0 0 18px;font-weight:700}
+  .mbtn{display:block;width:100%;text-align:left;background:rgba(255,255,255,.07);color:#e8e2d0;border:0;border-left:4px solid transparent;
+    padding:13px 16px;margin:0 0 8px;font-size:16px;letter-spacing:1px;cursor:pointer;font-weight:700}
+  .mbtn:hover{background:rgba(200,68,43,.35);border-left-color:#c8442b}
+  .mbtn.sm{width:auto;margin:0;white-space:nowrap}
+  .joinRow{display:flex;gap:8px;margin-bottom:8px}
+  #overlay input{background:rgba(0,0,0,.5);color:#fff;border:1px solid rgba(255,255,255,.3);padding:11px 12px;font-size:16px;margin-bottom:8px;
+    width:100%;text-transform:uppercase;user-select:text;-webkit-user-select:text;touch-action:auto}
+  #overlay #nameIn{text-transform:none}
+  .joinRow input{margin:0;width:120px}
+  #netInfo{font-size:14px;color:#ffd24a;min-height:20px;margin:4px 0 8px}
+  #roomCode{font-size:20px;color:#9dff9d;margin:0 0 12px;font-weight:700}
+  .mhelp p{font-size:12px;opacity:.72;margin:4px 0;max-width:470px}
+  #btnMenu{font-size:10px}
+</style>
+</head>
+<body>
+<div id="hud">
+  <div class="bar"><div id="hp" style="width:100%"></div><span>Здоровье</span></div>
+  <div class="bar"><div id="food" style="width:100%"></div><span>Сытость</span></div>
+</div>
+<div id="cross"></div>
+<div id="prompt"></div>
+<div id="toasts"></div>
+<div id="hurt"></div>
+<div id="memeBig"></div>
+<div id="dead"><div><div>ТЫ УМЕР</div><div id="deadSub"></div></div></div>
+
+<div id="buildPanel" class="noGame"></div>
+<div id="miniQ"><div id="miniQt"></div><div class="qb"><div id="miniQf" style="width:0%"></div></div></div>
+<div id="hotbar" class="noGame"></div>
+
+<div id="invScreen" class="noGame">
+  <div class="panel" id="invPanel">
+    <button id="closeBtn">✕ Закрыть</button>
+    <h2>ИНВЕНТАРЬ</h2>
+    <div id="bag"></div>
+    <div id="invHelp">Нажмите на предмет, затем на другой слот — предметы переместятся, поменяются местами или сложатся в стопку. Shift + клик — быстро перенести между рюкзаком и поясом. Нижний ряд (пояс) всегда на экране: выбирайте его слоты клавишами 1–6 или колёсиком.</div>
+  </div>
+  <div class="panel" id="craftPanel">
+    <h2>КРАФТ</h2>
+    <div id="craftBody"></div>
+  </div>
+</div>
+
+<div id="touch">
+  <div id="joyBase"><div id="joyKnob"></div></div>
+  <div class="btn" id="btnAct">ДЕЙСТВИЕ</div>
+  <div class="btn" id="btnJump">ПРЫЖОК</div>
+  <div id="side" class="noGame">
+    <div class="btn sm" id="btnInv">РЮКЗАК</div>
+    <div class="btn sm" id="btnCraft">КРАФТ</div>
+    <div class="btn sm" id="btnUse">ИСПОЛЬЗ.</div>
+    <div class="btn sm" id="btnMenu">МЕНЮ</div>
+    <div class="btn sm plan" id="btnPart">ЧАСТЬ</div>
+    <div class="btn sm plan" id="btnRot">ПОВОРОТ</div>
+    <div class="btn sm hammer" id="btnDemo">СНЕСТИ</div>
+  </div>
+</div>
+
+<div id="charPanel"></div>
+<div id="overlay">
+ <div id="menuBox">
+  <h1>WILD SURVIVAL</h1>
+  <div class="sub">ВЫЖИВАНИЕ · СТРОЙКА · РЕЙДЫ</div>
+  <p id="msg">Загрузка 3D-движка…</p>
+  <div id="menuMain" style="display:none">
+   <button class="mbtn" id="mbPlay">▶ ОДИНОЧНАЯ ИГРА</button>
+   <button class="mbtn" id="mbHost">СОЗДАТЬ КОМНАТУ (до 3 игроков)</button>
+   <div class="joinRow"><input id="joinCode" placeholder="КОД" maxlength="4" autocomplete="off"><button class="mbtn sm" id="mbJoin">ПОДКЛЮЧИТЬСЯ</button></div>
+   <input id="nameIn" placeholder="Ваше имя" maxlength="12" autocomplete="off">
+   <div id="netInfo"></div>
+  </div>
+  <div id="menuPause" style="display:none">
+   <div id="roomCode"></div>
+   <button class="mbtn" id="mbResume">▶ ПРОДОЛЖИТЬ</button>
+   <button class="mbtn" id="mbQuit">В ГЛАВНОЕ МЕНЮ</button>
+  </div>
+  <p id="playBtn" style="display:none"></p>
+  <div class="mhelp">
+   <p>Добывайте ресурсы, охотьтесь, стройте дом, берегитесь волков по ночам. Рейдите чужие базы бобовками и зарядами. Мультиплеер: один создаёт комнату и говорит друзьям 4-значный код.</p>
+   <p id="helpPC"><b>ПК:</b> WASD — движение, мышь — обзор, Пробел — прыжок, Shift — бег, ЛКМ — действие / бросок, Tab — инвентарь, <b>Q — крафт</b>, 1–6 / колёсико — пояс, <b>E — собрать ягоды / дверь / костёр</b>. С Планом: ПКМ или F — сменить часть, R — повернуть. С Киянкой: ЛКМ — улучшить, X — снести. Рейд: крафт «Бобовка» и «Сумка с зарядом» (вкладка «Рейд»).</p>
+   <p id="helpMobile"><b>Телефон:</b> левый джойстик — движение, правая часть экрана — обзор, ДЕЙСТВИЕ — удар / постройка / бросок, ИСПОЛЬЗ. — собрать ягоды / дверь / костёр, РЮКЗАК и КРАФТ — окна, МЕНЮ — пауза.</p>
+  </div>
+  <p><button id="resetSave">Сбросить сохранение</button></p>
+ </div>
+</div>
+
+<!-- ===================== ИГРА ===================== -->
+<script>
+(function () {
+'use strict';
+
+const msgEl = document.getElementById('msg');
+function showError(text) {
+  msgEl.className = 'err';
+  msgEl.textContent = 'Ошибка: ' + text;
+  document.getElementById('playBtn').style.display = 'none';
+  document.getElementById('overlay').style.display = 'flex';
+}
+window.addEventListener('error', function (e) {
+  showError((e.message || 'неизвестная ошибка') + (e.lineno ? ' (строка ' + e.lineno + ')' : ''));
+});
+window.addEventListener('unhandledrejection', function (e) {
+  showError(String(e.reason && e.reason.message || e.reason));
+});
+
+window.bootGame = function () {
+
+// ---------- Платформа ----------
+const isMobile = /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent)
+  || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  || (navigator.maxTouchPoints > 0 && !matchMedia('(hover: hover) and (pointer: fine)').matches);
+if (isMobile) document.body.classList.add('mobile');
+document.getElementById(isMobile ? 'helpPC' : 'helpMobile').style.display = 'none';
+
+const el = id => document.getElementById(id);
+
+// ---------- Утилиты ----------
+function mulberry32(a){ return function(){ a|=0; a=a+0x6D2B79F5|0; let t=Math.imul(a^a>>>15,1|a);
+  t=t+Math.imul(t^t>>>7,61|t)^t; return ((t^t>>>14)>>>0)/4294967296; }; }
+const rand = mulberry32(1337);
+const rr = (a,b) => a + rand()*(b-a);
+const clamp = (v,a,b) => Math.max(a, Math.min(b, v));
+
+// Высота ландшафта
+function h(x, z) {
+  let y = Math.sin(x*0.03)*Math.cos(z*0.027)*4
+        + Math.sin(x*0.011+1.3)*Math.sin(z*0.013)*7
+        + Math.sin(x*0.09+z*0.07)*0.7
+        + Math.cos(x*0.13-z*0.11)*0.4;
+  const d = Math.hypot(x, z);
+  const f = clamp((d-12)/25, 0, 1);
+  return y * f * f * (3 - 2*f);
+}
+
+// ---------- Сцена ----------
+let renderer;
+try {
+  renderer = new THREE.WebGLRenderer({ antialias: !isMobile });
+} catch (e) {
+  throw new Error('WebGL недоступен в этом браузере. Включите аппаратное ускорение.');
+}
+renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, isMobile ? 1.5 : 2));
+renderer.setSize(innerWidth, innerHeight);
+if (!isMobile) { renderer.shadowMap.enabled = true; renderer.shadowMap.type = THREE.PCFSoftShadowMap; }
+const canvas = renderer.domElement;
+document.body.insertBefore(canvas, document.body.firstChild);
+
+const scene = new THREE.Scene();
+const skyColor = new THREE.Color(0x87b4d8);
+scene.background = skyColor.clone();
+scene.fog = new THREE.Fog(skyColor.clone(), 40, 170);
+
+const camera = new THREE.PerspectiveCamera(72, innerWidth/innerHeight, 0.1, 400);
+camera.rotation.order = 'YXZ';
+scene.add(camera);
+
+const hemi = new THREE.HemisphereLight(0xcfe6ff, 0x4a5a2a, 0.7);
+scene.add(hemi);
+const sun = new THREE.DirectionalLight(0xfff2d0, 0.9);
+sun.castShadow = !isMobile;
+sun.shadow.mapSize.set(2048, 2048);
+const sCam = sun.shadow.camera;
+sCam.left = -45; sCam.right = 45; sCam.top = 45; sCam.bottom = -45; sCam.near = 1; sCam.far = 220;
+sun.shadow.bias = -0.0008;
+scene.add(sun);
+scene.add(sun.target);
+
+// ---------- Ландшафт ----------
+(function buildTerrain() {
+  const SIZE = 400, SEG = 128;
+  const g = new THREE.PlaneGeometry(SIZE, SIZE, SEG, SEG);
+  g.rotateX(-Math.PI/2);
+  const pos = g.attributes.position;
+  const colors = new Float32Array(pos.count * 3);
+  const grassA = new THREE.Color(0x3d7a1f), grassB = new THREE.Color(0x587f2a),
+        dirt = new THREE.Color(0x6b5a38), rock = new THREE.Color(0x777268), c = new THREE.Color();
+  for (let i = 0; i < pos.count; i++) {
+    const x = pos.getX(i), z = pos.getZ(i), y = h(x, z);
+    pos.setY(i, y);
+    const n = (Math.sin(x*0.21)*Math.cos(z*0.19) + 1) / 2;
+    c.copy(grassA).lerp(grassB, n);
+    if (y < -3.5) c.lerp(dirt, clamp((-3.5 - y)/3, 0, 1));
+    if (y > 5)    c.lerp(rock, clamp((y - 5)/4, 0, 0.8));
+    colors[i*3] = c.r; colors[i*3+1] = c.g; colors[i*3+2] = c.b;
+  }
+  g.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+  g.computeVertexNormals();
+  const m = new THREE.Mesh(g, new THREE.MeshLambertMaterial({ vertexColors: true, flatShading: true }));
+  m.receiveShadow = true;
+  scene.add(m);
+})();
+
+// ---------- Трава ----------
+(function buildGrass() {
+  const N = isMobile ? 3500 : 7000;
+  const geo = new THREE.ConeGeometry(0.12, 0.7, 3, 1); geo.translate(0, 0.35, 0);
+  const mesh = new THREE.InstancedMesh(geo, new THREE.MeshLambertMaterial({ color: 0xffffff }), N);
+  const dummy = new THREE.Object3D(), col = new THREE.Color();
+  for (let i = 0; i < N; i++) {
+    const x = rr(-130, 130), z = rr(-130, 130);
+    dummy.position.set(x, h(x, z), z);
+    dummy.rotation.set(rr(-.15,.15), rr(0,6.28), rr(-.15,.15));
+    const s = rr(0.7, 1.8); dummy.scale.set(s, s*rr(.8,1.5), s);
+    dummy.updateMatrix(); mesh.setMatrixAt(i, dummy.matrix);
+    col.setHSL(rr(0.22, 0.30), rr(0.5, 0.7), rr(0.25, 0.4)); mesh.setColorAt(i, col);
+  }
+  mesh.instanceMatrix.needsUpdate = true;
+  if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+  scene.add(mesh);
+})();
+
+// ---------- Объекты мира ----------
+const solids = [];   // круглые препятствия (деревья, камни)
+const targets = [];  // можно добывать
+
+const trunkMat = new THREE.MeshLambertMaterial({ color: 0x6b4a2b });
+const leafMats = [new THREE.MeshLambertMaterial({ color: 0x2f6b27, flatShading: true }),
+                  new THREE.MeshLambertMaterial({ color: 0x3a7a2c, flatShading: true })];
+const trunkGeo = new THREE.CylinderGeometry(0.25, 0.38, 4, 6); trunkGeo.translate(0, 2, 0);
+const leaf1 = new THREE.ConeGeometry(2.1, 3.6, 7); leaf1.translate(0, 5, 0);
+const leaf2 = new THREE.ConeGeometry(1.6, 3.0, 7); leaf2.translate(0, 6.9, 0);
+
+function makeTree(x, z) {
+  const g = new THREE.Group();
+  const t = new THREE.Mesh(trunkGeo, trunkMat);
+  const lm = leafMats[(rand()*2)|0];
+  const a = new THREE.Mesh(leaf1, lm), b = new THREE.Mesh(leaf2, lm);
+  [t, a, b].forEach(m => { m.castShadow = true; g.add(m); });
+  const s = rr(0.8, 1.5);
+  g.scale.setScalar(s);
+  g.position.set(x, h(x, z), z);
+  g.rotation.y = rr(0, 6.28);
+  g.userData = { type: 'tree', name: 'Дерево', hp: 8, max: 8, r: 0.55*s, alive: true, shake: 0, ry: g.rotation.y };
+  scene.add(g); solids.push(g); targets.push(g);
+}
+
+const rockGeo = new THREE.DodecahedronGeometry(1, 0);
+const rockMat = new THREE.MeshLambertMaterial({ color: 0x8a8780, flatShading: true });
+function makeRock(x, z) {
+  const m = new THREE.Mesh(rockGeo, rockMat);
+  const sx = rr(1, 2.1), sy = rr(0.8, 1.5), sz = rr(1, 2.1);
+  m.scale.set(sx, sy, sz);
+  m.position.set(x, h(x, z) + sy*0.35, z);
+  m.rotation.set(rr(-.2,.2), rr(0, 6.28), 0);
+  m.castShadow = true; m.receiveShadow = true;
+  m.userData = { type: 'rock', name: 'Камень', hp: 8, max: 8, r: Math.max(sx, sz)*0.85, alive: true, shake: 0, ry: m.rotation.y };
+  scene.add(m); solids.push(m); targets.push(m);
+}
+
+const bushGeo = new THREE.IcosahedronGeometry(0.75, 0);
+const bushMat = new THREE.MeshLambertMaterial({ color: 0x2f6a2a, flatShading: true });
+const berryGeo = new THREE.SphereGeometry(0.1, 6, 5);
+const berryMat = new THREE.MeshLambertMaterial({ color: 0xc8102e });
+function makeBush(x, z) {
+  const g = new THREE.Group();
+  const b = new THREE.Mesh(bushGeo, bushMat); b.position.y = 0.55; b.scale.y = 0.8; b.castShadow = true; g.add(b);
+  const berries = new THREE.Group();
+  for (let i = 0; i < 7; i++) {
+    const m = new THREE.Mesh(berryGeo, berryMat);
+    const a = rr(0, 6.28), e = rr(0.2, 0.9);
+    m.position.set(Math.cos(a)*0.7*Math.cos(e), 0.55 + Math.sin(e)*0.55, Math.sin(a)*0.7*Math.cos(e));
+    berries.add(m);
+  }
+  g.add(berries);
+  g.position.set(x, h(x, z), z);
+  g.userData = { type: 'bush', name: 'Куст с ягодами', hp: 1, max: 1, r: 0.9, alive: true, shake: 0, berries: true, berryGroup: berries, ry: 0 };
+  scene.add(g); targets.push(g);
+}
+
+for (let i = 0; i < 170; i++) { const x = rr(-185, 185), z = rr(-185, 185); if (Math.hypot(x, z) > 14) makeTree(x, z); }
+for (let i = 0; i < 70;  i++) { const x = rr(-185, 185), z = rr(-185, 185); if (Math.hypot(x, z) > 12) makeRock(x, z); }
+for (let i = 0; i < 45;  i++) { const x = rr(-185, 185), z = rr(-185, 185); if (Math.hypot(x, z) > 8) makeBush(x, z); }
+// Несколько ресурсов рядом со стартом (старт — ровная площадка, удобно строить)
+makeTree(11, -4); makeTree(-12, -7); makeTree(9, 11); makeTree(-9, 10);
+makeRock(13, 3); makeRock(-13, 2); makeBush(7, -9); makeBush(-8, -10);
+
+// ---------- Предметы ----------
+const ITEMS = {
+  wood:    { name: 'Дерево',            stack: 1000, desc: 'Основной строительный ресурс.' },
+  stone:   { name: 'Камень',            stack: 1000, desc: 'Нужен для каменных построек и инструментов.' },
+  berries: { name: 'Ягоды',             stack: 100,  desc: 'Выберите на поясе и нажмите ЛКМ — съесть (+25 сытости).' },
+  rock:    { name: 'Булыжник',          stack: 1,    desc: 'Стартовый инструмент. Добывает дерево и камень, но медленно.' },
+  hatchet: { name: 'Каменный топор',    stack: 1,    desc: 'Быстро рубит деревья.' },
+  pickaxe: { name: 'Каменная кирка',    stack: 1,    desc: 'Быстро добывает камень.' },
+  plan:    { name: 'План строительства',stack: 1,    desc: 'Ставит части дома как «ветки». ЛКМ — построить, ПКМ или F — сменить часть, R — повернуть лестницу.' },
+  hammer:  { name: 'Киянка',            stack: 1,    desc: 'ЛКМ по части дома — улучшить (ветки → дерево → камень). X — снести. Нужна, чтобы строить прочно.' },
+  door:    { name: 'Деревянная дверь',  stack: 5,    desc: 'Ставится в дверной проём (ЛКМ). E — открыть или закрыть.' },
+  raw_meat:    { name: 'Сырое мясо',    stack: 50, desc: 'Съешьте (+12 сытости) или пожарьте на костре.' },
+  cooked_meat: { name: 'Жареное мясо',  stack: 50, desc: 'Сытно и полезно: +40 сытости и +10 здоровья.' },
+  spear:       { name: 'Копьё',         stack: 1,  desc: 'Лучшее оружие против кабанов и волков.' },
+  campfire:    { name: 'Костёр',        stack: 5,  desc: 'Ставится на землю. Греет, светит и жарит мясо (E у костра).' },
+  beancan:     { name: 'Бобовка',       stack: 10, desc: 'Самодельная граната для рейда. ЛКМ — бросить, взрыв через 3 с. Хорошо рвёт ветки, дерево и двери.' },
+  satchel:     { name: 'Сумка с зарядом', stack: 5, desc: 'Мощный заряд для рейда. ЛКМ — бросить, взрыв через 5 с. Берёт и каменные стены.' }
+};
+const RES_NAME = { wood: 'дерева', stone: 'камня' };
+
+// Добыча за удар: [дерево, камень]
+const TOOLS = {
+  fist:    { wood: 5,  stone: 4 },
+  rock:    { wood: 10, stone: 10 },
+  hatchet: { wood: 25, stone: 6 },
+  pickaxe: { wood: 6,  stone: 25 }
+};
+const FELL_BONUS = 40;
+TOOLS.spear = { wood: 4, stone: 3 };
+const DMG = { fist: 6, rock: 10, hatchet: 22, pickaxe: 14, spear: 40, hammer: 12 };
+
+// Рецепты крафта (Q), как в Rust: стоимость + время создания
+const RECIPES = [
+  { id: 'plan',    cat: 'build', time: 3, cost: { wood: 20 } },
+  { id: 'hammer',  cat: 'build', time: 5, cost: { wood: 100 } },
+  { id: 'door',    cat: 'build', time: 6, cost: { wood: 200 } },
+  { id: 'hatchet', cat: 'tools', time: 6, cost: { wood: 200, stone: 100 } },
+  { id: 'pickaxe', cat: 'tools', time: 6, cost: { wood: 200, stone: 100 } },
+  { id: 'spear',   cat: 'weapons', time: 8, cost: { wood: 300 } },
+  { id: 'campfire', cat: 'surv', time: 4, cost: { wood: 100 } },
+  { id: 'beancan', cat: 'raid', time: 5, cost: { wood: 80, stone: 60 } },
+  { id: 'satchel', cat: 'raid', time: 10, cost: { wood: 250, stone: 250 } }
+];
+const CATS = [['all', 'Все'], ['build', 'Строительство'], ['tools', 'Инструменты'], ['weapons', 'Оружие'], ['surv', 'Выживание'], ['raid', 'Рейд']];
+
+// ---------- Иконки (SVG, без эмодзи) ----------
+const SVG = inner => '<svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">' + inner + '</svg>';
+const ICONS = {
+  wood: SVG('<rect x="5" y="12" width="30" height="13" rx="4" fill="#8b5a2b"/><ellipse cx="35" cy="18.5" rx="5" ry="6.5" fill="#c89a5c"/><circle cx="35" cy="18.5" r="2" fill="#8b5a2b"/><rect x="9" y="27" width="30" height="12" rx="4" fill="#7a4d24"/><ellipse cx="39" cy="33" rx="4.5" ry="6" fill="#c89a5c"/>'),
+  stone: SVG('<polygon points="7,35 13,16 28,9 42,20 38,37 20,41" fill="#9a9a9a" stroke="#5c5c5c" stroke-width="2"/><polygon points="13,16 28,9 26,24" fill="#bdbdbd"/>'),
+  berries: SVG('<circle cx="16" cy="29" r="8" fill="#c8102e"/><circle cx="31" cy="27" r="8" fill="#a50d26"/><circle cx="24" cy="16" r="7" fill="#d9223f"/><path d="M24 9 q5 -5 10 -3" stroke="#3a7a2c" stroke-width="3" fill="none"/>'),
+  rock: SVG('<polygon points="8,33 12,18 24,10 37,16 40,31 26,40" fill="#8a8780" stroke="#4d4b46" stroke-width="2"/><polygon points="12,18 24,10 22,24" fill="#aaa7a0"/>'),
+  hatchet: SVG('<rect x="22" y="6" width="5" height="38" rx="2" fill="#7a5230" transform="rotate(30 24 24)"/><polygon points="20,8 40,4 41,20 28,17" fill="#a0a0a0" stroke="#555" stroke-width="2"/>'),
+  pickaxe: SVG('<rect x="21.5" y="9" width="5" height="34" rx="2" fill="#7a5230"/><path d="M6 20 Q24 2 42 20" stroke="#a0a0a0" stroke-width="6" fill="none" stroke-linecap="round"/>'),
+  plan: SVG('<rect x="9" y="5" width="30" height="38" rx="2" fill="#2d6aa8" stroke="#a9d3ff" stroke-width="2"/><path d="M15 28 L24 18 L33 28 V37 H15 Z" fill="none" stroke="#fff" stroke-width="2"/><rect x="21" y="30" width="6" height="7" fill="#fff"/>'),
+  hammer: SVG('<rect x="21" y="14" width="6" height="30" rx="2" fill="#7a5230" transform="rotate(25 24 24)"/><rect x="8" y="6" width="26" height="12" rx="2" fill="#8a8a8a" stroke="#444" stroke-width="2" transform="rotate(25 21 12)"/>'),
+  door: SVG('<rect x="12" y="5" width="24" height="38" fill="#9a6b3a" stroke="#5a3a1a" stroke-width="2"/><rect x="16" y="10" width="16" height="12" fill="none" stroke="#6b4a25" stroke-width="2"/><rect x="16" y="26" width="16" height="12" fill="none" stroke="#6b4a25" stroke-width="2"/><circle cx="31" cy="25" r="2" fill="#e8e8e8"/>'),
+  raw_meat: SVG('<path d="M8 28 Q6 12 22 10 Q40 8 41 24 Q42 40 24 40 Q10 40 8 28Z" fill="#d94a5a" stroke="#8c1f2b" stroke-width="2"/><circle cx="31" cy="22" r="5" fill="#f2d4d4"/>'),
+  cooked_meat: SVG('<path d="M8 28 Q6 12 22 10 Q40 8 41 24 Q42 40 24 40 Q10 40 8 28Z" fill="#8a4b22" stroke="#4a2410" stroke-width="2"/><circle cx="31" cy="22" r="5" fill="#d9a066"/><path d="M14 20 L24 30 M20 16 L30 26" stroke="#4a2410" stroke-width="2"/>'),
+  spear: SVG('<rect x="22" y="4" width="4" height="42" rx="2" fill="#7a5230" transform="rotate(35 24 24)"/><polygon points="36,3 45,12 37,14 33,9" fill="#c4c4c4" stroke="#555" stroke-width="2"/>'),
+  campfire: SVG('<rect x="6" y="34" width="36" height="6" rx="3" fill="#5a3a1a" transform="rotate(-12 24 37)"/><rect x="6" y="34" width="36" height="6" rx="3" fill="#6b4a25" transform="rotate(12 24 37)"/><path d="M24 6 Q36 20 30 32 Q24 38 18 32 Q12 20 24 6Z" fill="#ff8c1a"/><path d="M24 18 Q30 26 27 32 Q24 35 21 32 Q18 26 24 18Z" fill="#ffd84a"/>'),
+  beancan: SVG('<rect x="14" y="14" width="20" height="26" rx="3" fill="#b8b8b8" stroke="#555" stroke-width="2"/><rect x="14" y="21" width="20" height="10" fill="#c8442b"/><path d="M24 14 q2 -8 9 -8" stroke="#e8c070" stroke-width="3" fill="none"/><circle cx="34" cy="6" r="2.5" fill="#ff9a1a"/>'),
+  satchel: SVG('<rect x="9" y="16" width="30" height="24" rx="4" fill="#6b4a2b" stroke="#3a2812" stroke-width="2"/><rect x="9" y="16" width="30" height="8" fill="#8a6238"/><rect x="21" y="24" width="6" height="8" fill="#d9d2b0"/><path d="M24 16 q0 -8 8 -9" stroke="#e8c070" stroke-width="3" fill="none"/><circle cx="32" cy="7" r="2.5" fill="#ff9a1a"/>')
+};
+
+// ---------- Инвентарь ----------
+const inv = new Array(30).fill(null);   // 0..5 — пояс, 6..29 — рюкзак
+let sel = 0, held = null, uiDirty = true;
+inv[0] = { id: 'rock', n: 1 };
+
+function countItem(id) { let c = 0; for (const s of inv) if (s && s.id === id) c += s.n; return c; }
+function addItem(id, n, preferBelt) {
+  const def = ITEMS[id]; let left = n;
+  const belt = [0,1,2,3,4,5], bag = [];
+  for (let i = 6; i < 30; i++) bag.push(i);
+  const seq = preferBelt ? belt.concat(bag) : bag.concat(belt);
+  for (const i of seq) {
+    const s = inv[i];
+    if (s && s.id === id && s.n < def.stack) { const t = Math.min(def.stack - s.n, left); s.n += t; left -= t; if (!left) break; }
+  }
+  for (const i of seq) {
+    if (!left) break;
+    if (!inv[i]) { const t = Math.min(def.stack, left); inv[i] = { id: id, n: t }; left -= t; }
+  }
+  uiDirty = true;
+  return left;
+}
+function removeItem(id, n) {
+  if (countItem(id) < n) return false;
+  let left = n;
+  for (let i = 29; i >= 0 && left > 0; i--) {
+    const s = inv[i];
+    if (s && s.id === id) { const t = Math.min(s.n, left); s.n -= t; left -= t; if (s.n <= 0) inv[i] = null; }
+  }
+  uiDirty = true;
+  return true;
+}
+const eqId = () => { const s = inv[sel]; return s ? s.id : null; };
+function moveItems(a, b) {
+  const A = inv[a], B = inv[b];
+  if (!A) return;
+  if (!B) { inv[b] = A; inv[a] = null; }
+  else if (B.id === A.id && ITEMS[A.id].stack > 1) {
+    const t = Math.min(ITEMS[B.id].stack - B.n, A.n); B.n += t; A.n -= t; if (A.n <= 0) inv[a] = null;
+  } else { inv[a] = B; inv[b] = A; }
+  uiDirty = true;
+}
+function quickMove(i) {
+  const s = inv[i]; if (!s) return;
+  const range = i < 6 ? [6, 30] : [0, 6];
+  for (let k = range[0]; k < range[1]; k++) {
+    const d = inv[k];
+    if (d && d.id === s.id && ITEMS[s.id].stack > 1 && d.n < ITEMS[s.id].stack) { moveItems(i, k); if (!inv[i]) return; }
+  }
+  for (let k = range[0]; k < range[1]; k++) if (!inv[k]) { moveItems(i, k); return; }
+}
+
+// ---------- Материалы и текстуры частей дома ----------
+function makeTex(fn) {
+  const c = document.createElement('canvas'); c.width = c.height = 128;
+  const x = c.getContext('2d'); fn(x);
+  const t = new THREE.CanvasTexture(c);
+  t.wrapS = t.wrapT = THREE.RepeatWrapping; t.repeat.set(1.5, 1.5);
+  return t;
+}
+const texTwig = makeTex(x => {
+  x.fillStyle = '#7d5f33'; x.fillRect(0, 0, 128, 128);
+  for (let i = 0; i < 46; i++) {
+    x.strokeStyle = Math.random() < 0.5 ? '#5a4222' : '#a07d48'; x.lineWidth = 2 + Math.random() * 3;
+    const a = Math.random() * 128, b = Math.random() * 128, l = 30 + Math.random() * 60, an = Math.random() * 3.14;
+    x.beginPath(); x.moveTo(a, b); x.lineTo(a + Math.cos(an) * l, b + Math.sin(an) * l); x.stroke();
+  }
+});
+const texWood = makeTex(x => {
+  x.fillStyle = '#a47b45'; x.fillRect(0, 0, 128, 128);
+  for (let y = 0; y < 128; y += 21) { x.fillStyle = '#6b4a25'; x.fillRect(0, y, 128, 3); }
+  for (let i = 0; i < 40; i++) { x.fillStyle = 'rgba(80,50,20,.25)'; x.fillRect(Math.random() * 128, Math.random() * 128, 20 + Math.random() * 40, 1.5); }
+});
+const texStone = makeTex(x => {
+  x.fillStyle = '#8a8a88'; x.fillRect(0, 0, 128, 128);
+  x.strokeStyle = '#5e5e5c'; x.lineWidth = 3;
+  for (let r = 0; r < 4; r++) {
+    const y = r * 32; x.beginPath(); x.moveTo(0, y); x.lineTo(128, y); x.stroke();
+    const off = (r % 2) * 32;
+    for (let c = 0; c < 4; c++) { x.beginPath(); x.moveTo(off + c * 64, y); x.lineTo(off + c * 64, y + 32); x.stroke(); }
+  }
+});
+const TIER_MATS = [
+  new THREE.MeshLambertMaterial({ map: texTwig }),
+  new THREE.MeshLambertMaterial({ map: texWood }),
+  new THREE.MeshLambertMaterial({ map: texStone })
+];
+const TIER_NAMES = ['Ветки', 'Дерево', 'Камень'];
+const TIER_RES = ['wood', 'wood', 'stone'];
+const HP_BASE = [60, 300, 600];
+function hpFor(p) { return HP_BASE[p.tier || 0] * (p.type === 'foundation' ? 2 : 1); }
+const DOOR_MAT = new THREE.MeshLambertMaterial({ map: texWood, color: 0xd9b27a });
+const ghostMat = new THREE.MeshBasicMaterial({ color: 0x44ff66, transparent: true, opacity: 0.42, depthWrite: false, side: THREE.DoubleSide });
+
+// ---------- Строительство (как в Rust) ----------
+const G = 3, WH = 3, WT = 0.25, STEP = 0.6;
+const PIECES = [
+  { id: 'foundation', name: 'Фундамент' },
+  { id: 'wall',       name: 'Стена' },
+  { id: 'doorway',    name: 'Дверной проём' },
+  { id: 'window',     name: 'Оконный проём' },
+  { id: 'floor',      name: 'Пол / потолок' },
+  { id: 'stairs',     name: 'Лестница' }
+];
+const PLACE_COST = 50;   // дерева за часть из веток
+// Цена улучшения: [ветки→дерево (дерево), дерево→камень (камень)]
+const UPG = [null,
+  { foundation: 100, wall: 100, doorway: 80,  window: 80,  floor: 80,  stairs: 80 },
+  { foundation: 150, wall: 150, doorway: 120, window: 120, floor: 120, stairs: 120 }
+];
+const DIRS = [[1,0],[0,1],[-1,0],[0,-1]];
+
+const pieces = new Map();     // ключ → часть
+const pieceGroups = [];       // для лучей прицеливания
+const boxes = [];             // коллизии (AABB)
+const surf = new Map();       // "i,j" → поверхности, по которым можно ходить
+let pieceIdx = 0, stairRot = 0;
+
+const kF = (i,j) => 'F:' + i + ',' + j;
+const kL = (i,j,k) => 'L:' + i + ',' + j + ',' + k;
+const kE = (o,i,j,k) => 'E:' + o + ',' + i + ',' + j + ',' + k;
+const kS = (i,j,k) => 'S:' + i + ',' + j + ',' + k;
+const getF = (i,j) => pieces.get(kF(i,j));
+const getL = (i,j,k) => pieces.get(kL(i,j,k));
+const getS = (i,j,k) => pieces.get(kS(i,j,k));
+const isEdgeType = t => t === 'wall' || t === 'doorway' || t === 'window';
+
+function surfaceTop(i, j, k) {
+  if (k === 0) { const f = getF(i, j); return f ? f.top : null; }
+  const l = getL(i, j, k); return l ? l.top : null;
+}
+function edgeCells(o, i, j) { return o === 'h' ? [[i, j-1], [i, j]] : [[i-1, j], [i, j]]; }
+function edgeBase(o, i, j, k) {
+  let t = null;
+  for (const c of edgeCells(o, i, j)) { const s = surfaceTop(c[0], c[1], k); if (s !== null && (t === null || s > t)) t = s; }
+  return t;
+}
+function wallBelow(i, j, k) {
+  return [['h',i,j],['h',i,j+1],['v',i,j],['v',i+1,j]].some(e => pieces.has(kE(e[0], e[1], e[2], k - 1)));
+}
+
+function edgeParts(type) {
+  if (type === 'wall') return [[G, WH, WT, 0, 1.5, 0]];
+  const pw = 0.55, ox = (G - pw) / 2;
+  if (type === 'doorway') return [[pw, WH, WT, -ox, 1.5, 0], [pw, WH, WT, ox, 1.5, 0], [G - 2*pw, 0.8, WT, 0, 2.6, 0]];
+  return [[pw, WH, WT, -ox, 1.5, 0], [pw, WH, WT, ox, 1.5, 0], [G - 2*pw, 1, WT, 0, 0.5, 0], [G - 2*pw, 1, WT, 0, 2.5, 0]];
+}
+function addBox(g, w, hh, d, x, y, z, mat) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d), mat);
+  m.position.set(x, y, z); m.castShadow = !isMobile; m.receiveShadow = true; g.add(m); return m;
+}
+function buildGroup(type, mat, opts) {
+  const g = new THREE.Group();
+  if (type === 'foundation') { const d = (opts && opts.depth) || 1; addBox(g, G, d, G, 0, -d/2, 0, mat); }
+  else if (type === 'floor') addBox(g, G, 0.2, G, 0, -0.1, 0, mat);
+  else if (type === 'stairs') { for (let n = 0; n < 6; n++) { const hh = (n + 1) * 0.5; addBox(g, 0.5, hh, G, -1.25 + n * 0.5, hh / 2, 0, mat); } }
+  else for (const p of edgeParts(type)) addBox(g, p[0], p[1], p[2], p[3], p[4], p[5], mat);
+  return g;
+}
+function eachMesh(o, fn) { if (o.isMesh) fn(o); const ch = o.children || []; for (let i = 0; i < ch.length; i++) eachMesh(ch[i], fn); }
+function setTier(p, t) {
+  p.tier = t; p.hp = hpFor(p);
+  eachMesh(p.group, m => { if (!m.userData.part) m.material = TIER_MATS[t]; });
+}
+
+// Призраки (зелёный/красный предпросмотр)
+const ghosts = {};
+for (const pc of PIECES) { const g = buildGroup(pc.id, ghostMat); g.visible = false; scene.add(g); ghosts[pc.id] = g; }
+
+function stairTop(p, x, z) {
+  const cx = (p.i + 0.5) * G, cz = (p.j + 0.5) * G, d = DIRS[p.dir];
+  let t = ((x - cx) * d[0] + (z - cz) * d[1] + G / 2) / G;
+  t = clamp(t, 0, 0.9999);
+  return p.baseY + (Math.floor(t * 6) + 1) * 0.5;
+}
+function addSurf(p, entry) {
+  const k = p.i + ',' + p.j; entry.piece = p;
+  if (!surf.has(k)) surf.set(k, []);
+  surf.get(k).push(entry);
+}
+function groundAt(x, z, py) {
+  let g = h(x, z);
+  const arr = surf.get(Math.floor(x / G) + ',' + Math.floor(z / G));
+  if (arr) for (const s of arr) { const t = s.fn ? s.fn(x, z) : s.top; if (t <= py + STEP && t > g) g = t; }
+  return g;
+}
+
+function edgeBox(p, lx0, lx1, lz0, lz1, y0, y1, step, door) {
+  const b = (p.o === 'h')
+    ? { x0: p.cx + lx0, x1: p.cx + lx1, z0: p.cz + lz0, z1: p.cz + lz1 }
+    : { x0: p.cx + lz0, x1: p.cx + lz1, z0: p.cz + lx0, z1: p.cz + lx1 };
+  b.y0 = y0; b.y1 = y1; b.step = step; b.piece = p; b.door = door || null;
+  boxes.push(b); return b;
+}
+
+function createPiece(t) {
+  const p = { type: t.type, i: t.i, j: t.j, k: t.k || 0, o: t.o, dir: t.dir || 0, tier: 0, placedAt: time, door: null, hp: 0 };
+  p.t = JSON.parse(JSON.stringify(t));
+  p.hp = hpFor(p);
+  let group;
+  if (t.type === 'foundation') {
+    p.top = t.top; p.bottom = t.top - t.depth;
+    group = buildGroup('foundation', TIER_MATS[0], { depth: t.depth });
+    group.position.set(t.cx, t.top, t.cz);
+    pieces.set(kF(p.i, p.j), p);
+    addSurf(p, { top: p.top });
+    const b = { x0: p.i * G, x1: (p.i + 1) * G, z0: p.j * G, z1: (p.j + 1) * G, y0: p.bottom, y1: p.top, step: STEP, piece: p, door: null };
+    boxes.push(b);
+  } else if (t.type === 'floor') {
+    p.top = t.top;
+    group = buildGroup('floor', TIER_MATS[0]);
+    group.position.set(t.cx, t.top, t.cz);
+    pieces.set(kL(p.i, p.j, p.k), p);
+    addSurf(p, { top: p.top });
+  } else if (t.type === 'stairs') {
+    p.baseY = t.baseY;
+    group = buildGroup('stairs', TIER_MATS[0]);
+    group.position.set(t.cx, t.baseY, t.cz);
+    group.rotation.y = -p.dir * Math.PI / 2;
+    pieces.set(kS(p.i, p.j, p.k), p);
+    addSurf(p, { fn: (x, z) => stairTop(p, x, z) });
+  } else {
+    p.baseY = t.baseY; p.cx = t.cx; p.cz = t.cz;
+    group = buildGroup(t.type, TIER_MATS[0]);
+    group.position.set(t.cx, t.baseY, t.cz);
+    group.rotation.y = (p.o === 'h') ? 0 : Math.PI / 2;
+    pieces.set(kE(p.o, p.i, p.j, p.k), p);
+    if (t.type === 'window') edgeBox(p, -G/2, G/2, -WT/2, WT/2, p.baseY, p.baseY + WH, 0.05);
+    else for (const pt of edgeParts(t.type)) edgeBox(p, pt[3] - pt[0]/2, pt[3] + pt[0]/2, pt[5] - pt[2]/2, pt[5] + pt[2]/2, p.baseY + pt[4] - pt[1]/2, p.baseY + pt[4] + pt[1]/2, 0.05);
+  }
+  group.userData = { piece: p };
+  p.group = group;
+  scene.add(group); pieceGroups.push(group);
+  return p;
+}
+
+function removePiece(p) {
+  scene.remove(p.group);
+  const gi = pieceGroups.indexOf(p.group); if (gi >= 0) pieceGroups.splice(gi, 1);
+  for (const [k, v] of pieces) if (v === p) { pieces.delete(k); break; }
+  for (let n = boxes.length - 1; n >= 0; n--) if (boxes[n].piece === p) boxes.splice(n, 1);
+  const sk = p.i + ',' + p.j, arr = surf.get(sk);
+  if (arr) { const rest = arr.filter(s => s.piece !== p); if (rest.length) surf.set(sk, rest); else surf.delete(sk); }
+  eachMesh(p.group, m => { if (m.geometry && m.geometry.dispose) m.geometry.dispose(); });
+}
+
+// Устойчивость: что осталось без опоры — рушится
+function settle() {
+  let removed = true, guard = 0;
+  while (removed && guard++ < 60) {
+    removed = false;
+    const ok = new Set(), q = [];
+    for (const p of pieces.values()) if (p.type === 'floor' && wallBelow(p.i, p.j, p.k)) { ok.add(p); q.push(p); }
+    while (q.length) {
+      const f = q.pop();
+      for (const d of [[1,0],[-1,0],[0,1],[0,-1]]) { const n = getL(f.i + d[0], f.j + d[1], f.k); if (n && !ok.has(n)) { ok.add(n); q.push(n); } }
+    }
+    for (const p of Array.from(pieces.values())) {
+      let good = true;
+      if (isEdgeType(p.type)) good = edgeCells(p.o, p.i, p.j).some(c => surfaceTop(c[0], c[1], p.k) !== null);
+      else if (p.type === 'floor') good = ok.has(p);
+      else if (p.type === 'stairs') good = surfaceTop(p.i, p.j, p.k) !== null;
+      if (!good) { removePiece(p); removed = true; }
+    }
+  }
+}
+
+function addDoor(p) {
+  const pivot = new THREE.Group();
+  pivot.position.set(-0.95, 0, 0);
+  const panel = addBox(pivot, 1.9, 2.2, 0.12, 0.95, 1.1, 0, DOOR_MAT);
+  panel.userData.part = 'door'; pivot.userData.part = 'door';
+  p.group.add(pivot);
+  const d = { open: false, angle: 0, pivot: pivot, hp: 250 };
+  p.door = d;
+  edgeBox(p, -0.95, 0.95, -0.1, 0.1, p.baseY, p.baseY + 2.2, 0.05, d);
+}
+
+function removeDoor(p) {
+  const d = p.door; if (!d) return;
+  p.group.remove(d.pivot);
+  for (let n = boxes.length - 1; n >= 0; n--) if (boxes[n].door === d) boxes.splice(n, 1);
+  p.door = null;
+}
+
+// ----- Прицел для строительства (чистая математика) -----
+function aimRay() {
+  const cp = Math.cos(player.pitch);
+  return { ox: player.pos.x, oy: player.pos.y + 1.7, oz: player.pos.z,
+           dx: -Math.sin(player.yaw) * cp, dy: Math.sin(player.pitch), dz: -Math.cos(player.yaw) * cp };
+}
+function dist2Ray(r, px, py, pz) {
+  const wx = px - r.ox, wy = py - r.oy, wz = pz - r.oz;
+  const t = wx * r.dx + wy * r.dy + wz * r.dz;
+  if (t < 0.3 || t > 12) return Infinity;
+  return Math.hypot(wx - r.dx * t, wy - r.dy * t, wz - r.dz * t);
+}
+function aimGround(r, maxT) {
+  for (let t = 0.5; t <= maxT; t += 0.15) {
+    const x = r.ox + r.dx * t, y = r.oy + r.dy * t, z = r.oz + r.dz * t;
+    let top = h(x, z);
+    const f = getF(Math.floor(x / G), Math.floor(z / G));
+    if (f && f.top > top) top = f.top;
+    if (y <= top) return { x: x, y: top, z: z, t: t };
+  }
+  return null;
+}
+function supports() {
+  const out = [];
+  for (const p of pieces.values()) {
+    if (p.type === 'foundation') out.push({ i: p.i, j: p.j, k: 0, top: p.top });
+    else if (p.type === 'floor') out.push({ i: p.i, j: p.j, k: p.k, top: p.top });
+  }
+  return out;
+}
+function blockedByWorld(cx, cz) {
+  for (const o of targets) {
+    const u = o.userData; if (!u.alive) continue;
+    if (Math.abs(o.position.x - cx) < G/2 + u.r && Math.abs(o.position.z - cz) < G/2 + u.r) return true;
+  }
+  return false;
+}
+function evalFoundation(i, j) {
+  const cx = (i + 0.5) * G, cz = (j + 0.5) * G;
+  let maxH = -1e9, minH = 1e9;
+  for (let a = 0; a <= 2; a++) for (let b = 0; b <= 2; b++) {
+    const hh = h(i * G + a * G/2, j * G + b * G/2); if (hh > maxH) maxH = hh; if (hh < minH) minH = hh;
+  }
+  let top = maxH + 0.05, reason = null;
+  const nbs = [getF(i+1, j), getF(i-1, j), getF(i, j+1), getF(i, j-1)].filter(Boolean);
+  if (nbs.length) { top = nbs[0].top; for (const n of nbs) if (Math.abs(n.top - top) > 0.02) reason = 'Разная высота соседних фундаментов'; }
+  if (!reason && getF(i, j)) reason = 'Занято';
+  if (!reason && maxH > top + 0.4) reason = 'Мешает рельеф';
+  if (!reason && top - minH > 3.2) reason = 'Слишком высоко над землёй';
+  if (!reason && blockedByWorld(cx, cz)) reason = 'Мешает дерево, камень или куст';
+  if (!reason && Math.abs(player.pos.x - cx) < G/2 + 0.5 && Math.abs(player.pos.z - cz) < G/2 + 0.5 && player.pos.y < top + 0.3) reason = 'Вы стоите на этом месте';
+  const bottom = minH - 0.6;
+  return { type: 'foundation', i: i, j: j, k: 0, cx: cx, cz: cz, top: top, depth: top - bottom, valid: !reason, reason: reason };
+}
+function targetFoundation(r) {
+  const g = aimGround(r, 9); if (!g) return null;
+  let i = Math.floor(g.x / G), j = Math.floor(g.z / G);
+  if (getF(i, j)) {
+    const lx = g.x - i * G, lz = g.z - j * G;
+    if (Math.min(lx, G - lx) < Math.min(lz, G - lz)) i += lx < G/2 ? -1 : 1; else j += lz < G/2 ? -1 : 1;
+  }
+  return evalFoundation(i, j);
+}
+function targetEdge(type, r) {
+  let best = null, bd = 1.9; const seen = new Set();
+  for (const sp of supports()) {
+    const eds = [['h', sp.i, sp.j], ['h', sp.i, sp.j + 1], ['v', sp.i, sp.j], ['v', sp.i + 1, sp.j]];
+    for (const e of eds) {
+      const key = kE(e[0], e[1], e[2], sp.k);
+      if (seen.has(key)) continue; seen.add(key);
+      if (pieces.has(key)) continue;
+      const base = edgeBase(e[0], e[1], e[2], sp.k);
+      const cx = e[0] === 'h' ? (e[1] + 0.5) * G : e[1] * G, cz = e[0] === 'h' ? e[2] * G : (e[2] + 0.5) * G;
+      const d = dist2Ray(r, cx, base + 1.5, cz);
+      if (d < bd) { bd = d; best = { type: type, o: e[0], i: e[1], j: e[2], k: sp.k, baseY: base, cx: cx, cz: cz, valid: true }; }
+    }
+  }
+  return best;
+}
+function targetFloor(r) {
+  const cands = new Map();
+  const add = (i, j, k, top) => { const key = i + ',' + j + ',' + k; if (!cands.has(key)) cands.set(key, { i: i, j: j, k: k, top: top }); };
+  for (const p of pieces.values()) {
+    if (isEdgeType(p.type)) for (const c of edgeCells(p.o, p.i, p.j)) add(c[0], c[1], p.k + 1, p.baseY + WH);
+    else if (p.type === 'floor') for (const d of [[1,0],[-1,0],[0,1],[0,-1]]) add(p.i + d[0], p.j + d[1], p.k, p.top);
+  }
+  let best = null, bd = 2.2;
+  for (const c of cands.values()) {
+    if (getL(c.i, c.j, c.k) || getS(c.i, c.j, c.k - 1)) continue;
+    const cx = (c.i + 0.5) * G, cz = (c.j + 0.5) * G;
+    const d = dist2Ray(r, cx, c.top, cz);
+    if (d < bd) { bd = d; best = { type: 'floor', i: c.i, j: c.j, k: c.k, cx: cx, cz: cz, top: c.top, valid: true }; }
+  }
+  return best;
+}
+function targetStairs(r) {
+  let best = null, bd = 2.2;
+  for (const sp of supports()) {
+    if (sp.k > 2 || getS(sp.i, sp.j, sp.k) || getL(sp.i, sp.j, sp.k + 1)) continue;
+    const cx = (sp.i + 0.5) * G, cz = (sp.j + 0.5) * G;
+    const d = dist2Ray(r, cx, sp.top, cz);
+    if (d < bd) { bd = d; best = { type: 'stairs', i: sp.i, j: sp.j, k: sp.k, cx: cx, cz: cz, baseY: sp.top, valid: true }; }
+  }
+  if (best) {
+    const fx = -Math.sin(player.yaw), fz = -Math.cos(player.yaw);
+    let dir = Math.abs(fx) > Math.abs(fz) ? (fx > 0 ? 0 : 2) : (fz > 0 ? 1 : 3);
+    best.dir = (dir + stairRot) % 4;
+  }
+  return best;
+}
+function computeTarget(type) {
+  const r = aimRay();
+  if (type === 'foundation') return targetFoundation(r);
+  if (type === 'floor') return targetFloor(r);
+  if (type === 'stairs') return targetStairs(r);
+  return targetEdge(type, r);
+}
+
+function updateGhost(t, afford) {
+  for (const k in ghosts) ghosts[k].visible = false;
+  if (!t) return;
+  const g = ghosts[t.type]; g.visible = true;
+  ghostMat.color.setHex(!t.valid ? 0xff4444 : (afford ? 0x44ff66 : 0xffb030));
+  if (t.type === 'foundation') { g.position.set(t.cx, t.top, t.cz); g.scale.set(1, t.depth, 1); }
+  else if (t.type === 'floor') g.position.set(t.cx, t.top, t.cz);
+  else if (t.type === 'stairs') { g.position.set(t.cx, t.baseY, t.cz); g.rotation.y = -t.dir * Math.PI / 2; }
+  else { g.position.set(t.cx, t.baseY, t.cz); g.rotation.y = (t.o === 'h') ? 0 : Math.PI / 2; }
+}
+
+// ---------- Инструменты в руке ----------
+const tool = new THREE.Group();
+tool.position.set(0.42, -0.42, -0.75);
+camera.add(tool);
+const hand = {};
+(function buildHands() {
+  const mkM = (geo, color) => { const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: color })); m.material.depthTest = false; m.renderOrder = 999; return m; };
+  const bx = (w, hh, d, color, x, y, z) => { const m = mkM(new THREE.BoxGeometry(w, hh, d), color); m.position.set(x, y, z); return m; };
+  const mk = (id, parts) => { const g = new THREE.Group(); parts.forEach(p => g.add(p)); g.visible = false; tool.add(g); hand[id] = g; };
+  mk('rock', [(() => { const m = mkM(new THREE.DodecahedronGeometry(0.14, 0), 0x8a8780); m.position.y = 0.2; return m; })()]);
+  mk('hatchet', [bx(0.05, 0.6, 0.05, 0x7a5230, 0, 0.1, 0), bx(0.26, 0.13, 0.05, 0x9a9a9a, 0.08, 0.4, 0)]);
+  mk('pickaxe', [bx(0.05, 0.62, 0.05, 0x7a5230, 0, 0.1, 0), bx(0.5, 0.06, 0.06, 0x9a9a9a, 0, 0.42, 0)]);
+  mk('hammer', [bx(0.05, 0.55, 0.05, 0x7a5230, 0, 0.1, 0), bx(0.22, 0.15, 0.15, 0x7b7b7b, 0, 0.42, 0)]);
+  mk('plan', [bx(0.28, 0.36, 0.02, 0x2d6aa8, 0, 0.2, 0), bx(0.2, 0.02, 0.025, 0xffffff, 0, 0.28, 0.01), bx(0.2, 0.02, 0.025, 0xffffff, 0, 0.2, 0.01)]);
+  mk('door', [bx(0.28, 0.42, 0.04, 0x9a6b3a, 0, 0.2, 0)]);
+  mk('spear', [bx(0.04, 0.9, 0.04, 0x7a5230, 0, 0.3, 0), bx(0.07, 0.18, 0.03, 0xbdbdbd, 0, 0.82, 0)]);
+  mk('campfire', [bx(0.3, 0.1, 0.1, 0x5a3a1a, 0, 0.15, 0), bx(0.1, 0.18, 0.1, 0xff8c1a, 0, 0.28, 0)]);
+  mk('beancan', [bx(0.12, 0.2, 0.12, 0xb8b8b8, 0, 0.2, 0), bx(0.125, 0.07, 0.125, 0xc8442b, 0, 0.2, 0)]);
+  mk('satchel', [bx(0.26, 0.2, 0.14, 0x6b4a2b, 0, 0.2, 0), bx(0.05, 0.1, 0.05, 0xd9d2b0, 0, 0.3, 0.08)]);
+  mk('raw_meat', [bx(0.2, 0.12, 0.14, 0xd94a5a, 0, 0.2, 0)]);
+  mk('cooked_meat', [bx(0.2, 0.12, 0.14, 0x8a4b22, 0, 0.2, 0)]);
+  mk('wood', [bx(0.34, 0.08, 0.08, 0x8b5a2b, 0, 0.2, 0)]);
+  mk('stone', [bx(0.16, 0.12, 0.14, 0x8a8a8a, 0, 0.2, 0)]);
+  mk('berries', [(() => { const m = mkM(new THREE.SphereGeometry(0.09, 8, 6), 0xc8102e); m.position.y = 0.2; return m; })()]);
+})();
+
+// ---------- Состояние игрока ----------
+const spawn = new THREE.Vector3(0, 0, 0);
+const player = { pos: new THREE.Vector3(), vy: 0, onGround: true, yaw: 0, pitch: 0 };
+const stats = { hp: 100, food: 100 };
+let dead = false, started = false, paused = true, swing = 0, cd = 0, attackHeld = false, pendingAttack = false;
+let uiOpen = false, uiMode = 'inv', time = 0;
+const overlay = el('overlay');
+
+function respawn() {
+  player.pos.copy(spawn); player.pos.y = h(0, 0); player.vy = 0; player.yaw = 0; player.pitch = 0;
+  stats.hp = 100; stats.food = 100; dead = false;
+  el('dead').style.display = 'none';
+}
+respawn();
+
+// ---------- Ввод ----------
+const keys = {};
+let jumpReq = false, sprint = false, useReq = false, rotReq = false, partReq = false, demoReq = false;
+const joy = { id: null, x: 0, y: 0 };
+let lookId = null, lastLX = 0, lastLY = 0;
+let hadLock = false, noLock = false;
+
+function selectSlot(n) { sel = ((n % 6) + 6) % 6; uiDirty = true; }
+
+addEventListener('keydown', e => {
+  if (!started || paused) { keys[e.code] = true; return; }
+  if (e.code === 'Tab') { e.preventDefault(); openUI('inv'); return; }
+  if (e.code === 'KeyQ') { e.preventDefault(); openUI('craft'); return; }
+  if (e.code === 'Escape' && uiOpen) { closeUI(); return; }
+  keys[e.code] = true;
+  if (e.code === 'Space') { jumpReq = true; e.preventDefault(); }
+  if (e.code === 'KeyE') useReq = true;
+  if (e.code === 'KeyR') rotReq = true;
+  if (e.code === 'KeyF') partReq = true;
+  if (e.code === 'KeyX') demoReq = true;
+  if (e.code.indexOf('Digit') === 0) { const n = parseInt(e.code.slice(5), 10); if (n >= 1 && n <= 6) selectSlot(n - 1); }
+});
+addEventListener('keyup', e => { keys[e.code] = false; });
+addEventListener('wheel', e => { if (!started || paused || uiOpen) return; selectSlot(sel + (e.deltaY > 0 ? 1 : -1)); }, { passive: true });
+
+addEventListener('mousemove', e => {
+  if (isMobile || paused || uiOpen) return;
+  const locked = document.pointerLockElement === canvas;
+  if (!locked && !(noLock && (e.buttons & 2))) return;   // без захвата курсора: смотреть, зажав ПКМ
+  player.yaw   -= (e.movementX || 0) * 0.0022;
+  player.pitch -= (e.movementY || 0) * 0.0022;
+  player.pitch = clamp(player.pitch, -1.5, 1.5);
+});
+addEventListener('mousedown', e => {
+  if (isMobile || paused || !started || uiOpen) return;
+  if (!(document.pointerLockElement === canvas || noLock)) return;
+  if (e.button === 0) { attackHeld = true; pendingAttack = true; }
+  else if (e.button === 2 && document.pointerLockElement === canvas) partReq = true;
+});
+addEventListener('mouseup', e => { if (e.button === 0) attackHeld = false; });
+
+document.addEventListener('pointerlockchange', () => {
+  if (isMobile) return;
+  if (document.pointerLockElement === canvas) { hadLock = true; noLock = false; }
+  else if (hadLock && started && !dead) {
+    hadLock = false;
+    if (!uiOpen) { paused = true; showMenu('pause'); }
+  }
+});
+document.addEventListener('pointerlockerror', () => { noLock = true; });
+
+// Тач: джойстик + осмотр
+const joyBase = el('joyBase'), joyKnob = el('joyKnob');
+function updateJoy(t) {
+  const r = joyBase.getBoundingClientRect(), max = r.width/2;
+  let dx = t.clientX - (r.left + max), dy = t.clientY - (r.top + max);
+  const len = Math.hypot(dx, dy), k = len > max ? max/len : 1;
+  dx *= k; dy *= k;
+  joyKnob.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+  joy.x = dx/max; joy.y = dy/max;
+}
+function resetJoy() { joy.id = null; joy.x = joy.y = 0; joyKnob.style.transform = 'translate(0,0)'; }
+const skipTouch = t => t.target.closest && t.target.closest('.btn, .noGame');
+
+addEventListener('touchstart', e => {
+  if (paused || uiOpen) return;
+  for (const t of e.changedTouches) {
+    if (skipTouch(t)) continue;
+    if (t.clientX < innerWidth*0.45 && joy.id === null) { joy.id = t.identifier; updateJoy(t); }
+    else if (t.clientX >= innerWidth*0.45 && lookId === null) { lookId = t.identifier; lastLX = t.clientX; lastLY = t.clientY; }
+  }
+}, { passive: false });
+addEventListener('touchmove', e => {
+  if (!(e.target.closest && e.target.closest('#invScreen, .rlist'))) e.preventDefault();
+  for (const t of e.changedTouches) {
+    if (t.identifier === joy.id) updateJoy(t);
+    else if (t.identifier === lookId) {
+      player.yaw   -= (t.clientX - lastLX) * 0.005;
+      player.pitch -= (t.clientY - lastLY) * 0.005;
+      player.pitch = clamp(player.pitch, -1.5, 1.5);
+      lastLX = t.clientX; lastLY = t.clientY;
+    }
+  }
+}, { passive: false });
+function endTouch(e) {
+  for (const t of e.changedTouches) {
+    if (t.identifier === joy.id) resetJoy();
+    if (t.identifier === lookId) lookId = null;
+  }
+}
+addEventListener('touchend', endTouch); addEventListener('touchcancel', endTouch);
+
+function bindBtn(id, down, up) {
+  const b = el(id);
+  b.addEventListener('touchstart', e => { e.preventDefault(); e.stopPropagation(); b.classList.add('active'); if (down) down(); }, { passive: false });
+  const end = e => { e.preventDefault(); b.classList.remove('active'); if (up) up(); };
+  b.addEventListener('touchend', end, { passive: false }); b.addEventListener('touchcancel', end, { passive: false });
+}
+bindBtn('btnAct', () => { if (!uiOpen) { attackHeld = true; pendingAttack = true; } }, () => { attackHeld = false; });
+bindBtn('btnJump', () => { jumpReq = true; });
+bindBtn('btnInv', () => { openUI('inv'); });
+bindBtn('btnCraft', () => { openUI('craft'); });
+bindBtn('btnUse', () => { useReq = true; });
+bindBtn('btnMenu', () => { if (started && !dead) { paused = true; showMenu('pause'); } });
+bindBtn('btnPart', () => { partReq = true; });
+bindBtn('btnRot', () => { rotReq = true; });
+bindBtn('btnDemo', () => { demoReq = true; });
+document.addEventListener('contextmenu', e => e.preventDefault());
+
+// ---------- Звук ----------
+let actx = null;
+function initAudio() {
+  try { actx = actx || new (window.AudioContext || window.webkitAudioContext)(); if (actx.state === 'suspended') actx.resume(); } catch (e) {}
+}
+function beep(freq, dur, type, vol) {
+  if (!actx) return;
+  try {
+    const o = actx.createOscillator(), g = actx.createGain();
+    o.type = type || 'square'; o.frequency.value = freq; g.gain.value = vol || 0.06;
+    g.gain.exponentialRampToValueAtTime(0.0001, actx.currentTime + (dur || 0.08));
+    o.connect(g); g.connect(actx.destination); o.start(); o.stop(actx.currentTime + (dur || 0.08));
+  } catch (e) {}
+}
+
+// ---------- Интерфейс: пояс, рюкзак, крафт ----------
+const toasts = el('toasts');
+function toast(text) {
+  const d = document.createElement('div'); d.className = 'toast'; d.textContent = text;
+  toasts.appendChild(d); setTimeout(() => d.remove(), 1400);
+}
+function slotHTML(i) {
+  const it = inv[i];
+  let s = '<div class="slot' + (i === sel && i < 6 ? ' sel' : '') + (held === i ? ' held' : '') + '" data-i="' + i + '"' + (it ? ' title="' + ITEMS[it.id].name + '"' : '') + '>';
+  if (i < 6) s += '<span class="k">' + (i + 1) + '</span>';
+  if (it) s += ICONS[it.id] + (it.n > 1 ? '<span class="n">' + it.n + '</span>' : '');
+  return s + '</div>';
+}
+function renderHotbar() { let s = ''; for (let i = 0; i < 6; i++) s += slotHTML(i); el('hotbar').innerHTML = s; }
+function renderBag() { let s = ''; for (let i = 6; i < 30; i++) s += slotHTML(i); el('bag').innerHTML = s; }
+
+function onSlotClick(e) {
+  const d = e.target.closest ? e.target.closest('.slot') : null; if (!d) return;
+  const i = parseInt(d.getAttribute('data-i'), 10);
+  if (!uiOpen) { if (i < 6) selectSlot(i); return; }
+  if (e.shiftKey) { quickMove(i); held = null; return; }
+  if (held === null) { if (inv[i]) held = i; }
+  else if (held === i) held = null;
+  else { moveItems(held, i); held = null; }
+  uiDirty = true;
+}
+el('hotbar').addEventListener('click', onSlotClick);
+el('bag').addEventListener('click', onSlotClick);
+
+// Крафт
+const queue = [];
+let craftCat = 'all', craftSel = 'plan';
+const recipeOf = id => RECIPES.find(r => r.id === id);
+function canCraft(r) { for (const k in r.cost) if (countItem(k) < r.cost[k]) return false; return true; }
+function queueCraft(id) {
+  const r = recipeOf(id); if (!r) return false;
+  if (!canCraft(r)) { toast('Не хватает ресурсов'); return false; }
+  for (const k in r.cost) removeItem(k, r.cost[k]);
+  queue.push({ id: id, left: r.time, total: r.time });
+  uiDirty = true; beep(520, 0.06, 'sine');
+  return true;
+}
+function cancelCraft(n) {
+  const q = queue[n]; if (!q) return;
+  const r = recipeOf(q.id);
+  for (const k in r.cost) addItem(k, r.cost[k]);
+  queue.splice(n, 1); uiDirty = true;
+}
+function updateQueue(dt) {
+  const mq = el('miniQ');
+  if (!queue.length) { mq.style.display = 'none'; return; }
+  const q = queue[0]; q.left -= dt;
+  if (q.left <= 0) {
+    queue.shift();
+    const left = addItem(q.id, 1, true);
+    if (left > 0) { const r = recipeOf(q.id); for (const k in r.cost) addItem(k, r.cost[k]); toast('Инвентарь полон'); }
+    else { toast('Создано: ' + ITEMS[q.id].name); beep(660, 0.12, 'triangle'); if (CRAFT_MEME[q.id]) meme(CRAFT_MEME[q.id], 'c_' + q.id); }
+    uiDirty = true;
+  }
+  if (queue.length) {
+    mq.style.display = 'block';
+    el('miniQt').textContent = 'Создаётся: ' + ITEMS[queue[0].id].name + ' (' + Math.max(0, Math.ceil(queue[0].left)) + ' с)' + (queue.length > 1 ? ' + ещё ' + (queue.length - 1) : '');
+    el('miniQf').style.width = (100 * (1 - queue[0].left / queue[0].total)) + '%';
+    const f = document.querySelector('.qfill[data-q="0"]');
+    if (f) f.style.width = (100 * (1 - queue[0].left / queue[0].total)) + '%';
+  } else mq.style.display = 'none';
+}
+function renderCraft() {
+  let s = '<div class="tabs">';
+  for (const c of CATS) s += '<button class="tab' + (craftCat === c[0] ? ' on' : '') + '" data-tab="' + c[0] + '">' + c[1] + '</button>';
+  s += '</div><div class="rlist">';
+  for (const r of RECIPES) {
+    if (craftCat !== 'all' && r.cat !== craftCat) continue;
+    s += '<div class="rrow' + (craftSel === r.id ? ' on' : '') + (canCraft(r) ? '' : ' dim') + '" data-rec="' + r.id + '"><div class="ri">' + ICONS[r.id] + '</div><div class="rn">' + ITEMS[r.id].name + '</div></div>';
+  }
+  s += '</div>';
+  const r = recipeOf(craftSel) || RECIPES[0];
+  s += '<div class="rdet"><div class="rt">' + ITEMS[r.id].name + '</div><div class="rd">' + ITEMS[r.id].desc + '</div><div class="rc">';
+  for (const k in r.cost) { const have = countItem(k); s += '<span class="cost' + (have >= r.cost[k] ? '' : ' bad') + '"><i class="ci">' + ICONS[k] + '</i>' + have + ' / ' + r.cost[k] + '</span>'; }
+  s += '</div><div class="rm">Время создания: ' + r.time + ' с</div><button class="cbtn" data-craft="' + r.id + '"' + (canCraft(r) ? '' : ' disabled') + '>СОЗДАТЬ</button></div>';
+  s += '<div class="rq"><div class="rt">Очередь</div>';
+  if (!queue.length) s += '<div class="rd">Пусто</div>';
+  queue.forEach((q, n) => {
+    const pct = 100 * (1 - q.left / q.total);
+    s += '<div class="qrow"><i class="ci">' + ICONS[q.id] + '</i><span>' + ITEMS[q.id].name + '</span><div class="qbar"><div class="qfill" data-q="' + n + '" style="width:' + pct + '%"></div></div><button class="qx" data-cancel="' + n + '">×</button></div>';
+  });
+  s += '</div>';
+  el('craftBody').innerHTML = s;
+}
+el('craftBody').addEventListener('click', e => {
+  const t = e.target.closest ? e.target.closest('[data-tab],[data-rec],[data-craft],[data-cancel]') : null; if (!t) return;
+  if (t.hasAttribute('data-tab')) craftCat = t.getAttribute('data-tab');
+  else if (t.hasAttribute('data-rec')) craftSel = t.getAttribute('data-rec');
+  else if (t.hasAttribute('data-craft')) queueCraft(t.getAttribute('data-craft'));
+  else if (t.hasAttribute('data-cancel')) cancelCraft(parseInt(t.getAttribute('data-cancel'), 10));
+  uiDirty = true;
+});
+
+// План строительства: панель выбора части
+function renderBuildPanel() {
+  let s = '<div class="bt">ПЛАН СТРОИТЕЛЬСТВА</div>';
+  PIECES.forEach((p, n) => { s += '<div class="bp' + (n === pieceIdx ? ' on' : '') + '" data-p="' + n + '">' + p.name + '<small>' + PLACE_COST + '</small></div>'; });
+  s += '<div class="bh">' + (isMobile ? 'ЧАСТЬ / ПОВОРОТ — кнопки справа' : 'ПКМ или F — сменить · R — повернуть') + '</div>';
+  el('buildPanel').innerHTML = s;
+}
+el('buildPanel').addEventListener('click', e => {
+  const d = e.target.closest ? e.target.closest('.bp') : null; if (!d) return;
+  pieceIdx = parseInt(d.getAttribute('data-p'), 10); renderBuildPanel();
+});
+
+function openUI(mode) {
+  if (dead) return;
+  if (uiOpen && uiMode === mode) { closeUI(); return; }
+  uiOpen = true; uiMode = mode; held = null;
+  el('invScreen').style.display = 'flex';
+  el('invScreen').className = 'noGame' + (mode === 'craft' ? ' craft' : '');
+  attackHeld = false; pendingAttack = false;
+  if (!isMobile) { try { document.exitPointerLock(); } catch (e) {} }
+  uiDirty = true;
+}
+function closeUI() {
+  uiOpen = false; held = null;
+  el('invScreen').style.display = 'none';
+  if (!isMobile && started && !paused) {
+    try { const p = canvas.requestPointerLock(); if (p && p.catch) p.catch(() => { noLock = true; }); } catch (e) { noLock = true; }
+  }
+  uiDirty = true;
+}
+el('closeBtn').addEventListener('click', closeUI);
+el('invScreen').addEventListener('click', e => { if (e.target === el('invScreen')) closeUI(); });
+
+// ---------- Старт ----------
+function startGame() {
+  const first = !started;
+  started = true; paused = false; overlay.style.display = 'none';
+  initAudio();
+  if (!isMobile) {
+    try {
+      const p = canvas.requestPointerLock();
+      if (p && p.catch) p.catch(() => { noLock = true; });
+    } catch (e) { noLock = true; }
+  } else {
+    try {
+      const d = document.documentElement, f = d.requestFullscreen || d.webkitRequestFullscreen;
+      if (f) { const p = f.call(d); if (p && p.catch) p.catch(() => {}); }
+    } catch (e) {}
+  }
+  if (first) toast(isMobile ? 'Нажмите КРАФТ, чтобы создавать предметы' : 'Q — крафт, Tab — инвентарь');
+}
+// ---------- Меню ----------
+function showMenu(mode) {
+  overlay.style.display = 'flex';
+  el('menuMain').style.display = mode === 'main' ? 'block' : 'none';
+  el('menuPause').style.display = mode === 'pause' ? 'block' : 'none';
+  el('roomCode').textContent = net.on ? (net.host ? 'КОД КОМНАТЫ: ' + net.code + '  (' + (net.conns.length + 1) + '/3)' : 'Вы подключены к комнате') : '';
+  el('mbResume').textContent = started ? '▶ ПРОДОЛЖИТЬ' : '▶ ИГРАТЬ';
+}
+function readName() {
+  const v = (el('nameIn').value || '').trim().slice(0, 12);
+  net.name = v || ('Игрок' + (((Math.random() * 90) + 10) | 0));
+  try { localStorage.setItem('wsName', net.name); } catch (e) {}
+}
+try { el('nameIn').value = localStorage.getItem('wsName') || ''; } catch (e) {}
+el('mbPlay').addEventListener('click', () => { readName(); loadGame(); startGame(); });
+el('mbHost').addEventListener('click', () => {
+  readName(); netInfo('Создаю комнату…'); loadGame();
+  netHost(() => { netInfo(''); showMenu('pause'); });
+});
+el('mbJoin').addEventListener('click', () => {
+  readName();
+  const code = el('joinCode').value.trim().toUpperCase();
+  if (code.length < 4) { netInfo('Введите код из 4 символов', true); return; }
+  netInfo('Подключаюсь…'); noSave = true;
+  netJoin(code, () => { netInfo(''); showMenu('pause'); });
+});
+el('mbResume').addEventListener('click', startGame);
+el('mbQuit').addEventListener('click', () => { saveGame(); location.reload(); });
+
+// ---------- Геймплей ----------
+const raycaster = new THREE.Raycaster(); raycaster.far = 5;
+const center = new THREE.Vector2(0, 0);
+let aimed = null, aimedPiece = null, aimedDoor = false, aimedFire = null, aimAnimal = null;
+function updateAim() {
+  raycaster.setFromCamera(center, camera);
+  const hits = raycaster.intersectObjects(targets.concat(pieceGroups), true);
+  aimed = null; aimedPiece = null; aimedDoor = false;
+  for (const hit of hits) {
+    let o = hit.object, isDoor = false;
+    while (o) {
+      if (o.userData && o.userData.part === 'door') isDoor = true;
+      if (o.userData && (o.userData.type || o.userData.piece)) break;
+      o = o.parent;
+    }
+    if (!o) continue;
+    if (o.userData.piece) { aimedPiece = o.userData.piece; aimedDoor = isDoor; break; }
+    if (o.userData.alive) { aimed = o; break; }
+  }
+}
+
+const falling = [];
+function giveRes(id, n) {
+  const left = addItem(id, n, false);
+  if (left < n) toast('+' + (n - left) + ' ' + ITEMS[id].name);
+  if (left > 0) toast('Инвентарь полон');
+}
+function harvestAim() {
+  if (!aimed) { beep(140, 0.06, 'triangle'); return; }
+  const o = aimed, u = o.userData, eq = eqId();
+  if (u.type === 'bush') {
+    if (!bushUse) { toast('Ягоды собираются на E'); return; }
+    if (!u.berries) return;
+    u.berries = false; u.berryGroup.visible = false;
+    netSend({ t: 'berry', i: targets.indexOf(o) });
+    giveRes('berries', 3); beep(700, 0.1, 'sine');
+    setTimeout(() => { u.berries = true; u.berryGroup.visible = true; }, 40000);
+    return;
+  }
+  const tl = TOOLS[eq || 'fist'];
+  u.hp--; u.shake = 0.25; netSend({ t: 'res', i: targets.indexOf(o), hp: u.hp, dead: u.hp <= 0 });
+  if (u.type === 'tree') { giveRes('wood', tl.wood); beep(180, 0.09, 'square'); }
+  else { giveRes('stone', tl.stone); beep(330, 0.07, 'square'); }
+  if (u.hp <= 0) {
+    u.alive = false;
+    if (u.type === 'tree') { giveRes('wood', FELL_BONUS); falling.push({ o: o, t: 0 }); meme('Лесоруб 80 уровня', 'felled'); }
+    else { giveRes('stone', FELL_BONUS); scene.remove(o); setTimeout(() => respawnObj(o), 90000); }
+  }
+}
+function respawnObj(o) {
+  o.userData.hp = o.userData.max; o.userData.alive = true; o.userData.shake = 0;
+  o.rotation.x = 0; o.rotation.z = 0; o.rotation.y = o.userData.ry;
+  scene.add(o);
+}
+
+function currentTarget() { return computeTarget(PIECES[pieceIdx].id); }
+function placeCurrent() {
+  const t = currentTarget();
+  if (!t) { toast('Нет подходящего места'); return; }
+  if (!t.valid) { toast(t.reason || 'Сюда нельзя'); return; }
+  if (countItem('wood') < PLACE_COST) { toast('Нужно ' + PLACE_COST + ' дерева'); return; }
+  removeItem('wood', PLACE_COST);
+  createPiece(t); netSend({ t: 'place', p: t });
+  if (PIECE_MEME[t.type]) meme(PIECE_MEME[t.type], 'p_' + t.type);
+  beep(240, 0.12, 'sawtooth');
+}
+function toggleDoor(p) { if (p && p.door) { p.door.open = !p.door.open; beep(p.door.open ? 300 : 220, 0.08, 'triangle'); netSend({ t: 'door', k: pkey(p), a: 'set', open: p.door.open }); } }
+function placeDoor() {
+  const p = aimedPiece;
+  if (!p || p.type !== 'doorway') { toast('Наведитесь на дверной проём'); return; }
+  if (p.door) { toggleDoor(p); return; }
+  if (!removeItem('door', 1)) return;
+  addDoor(p); netSend({ t: 'door', k: pkey(p), a: 'add' }); beep(260, 0.1, 'sawtooth'); meme('Дверь! Теперь я домовладелец', 'door1');
+}
+function hammerHit() {
+  const p = aimedPiece; if (!p) return;
+  if (p.tier >= 2) { toast('Уже самый прочный уровень'); return; }
+  const nt = p.tier + 1, res = TIER_RES[nt], cost = UPG[nt][p.type];
+  if (countItem(res) < cost) { toast('Нужно ' + cost + ' ' + RES_NAME[res]); return; }
+  removeItem(res, cost); setTier(p, nt); netSend({ t: 'tier', k: pkey(p), tier: nt });
+  toast('Улучшено: ' + TIER_NAMES[nt]); meme(nt === 2 ? 'Каменный век... в 2026-м' : 'Ну всё, теперь это крепость', 'up_' + nt); beep(400, 0.12, 'square');
+}
+function demolish() {
+  const p = aimedPiece; if (!p) return;
+  if (p.tier === 0 || time - p.placedAt < 300) { netSend({ t: 'rem', k: pkey(p) }); removePiece(p); settle(); toast('Снесено'); beep(120, 0.15, 'sawtooth'); }
+  else toast('Снести можно только ветки или в первые 5 минут');
+}
+function primary() {
+  swing = 1; cd = 0.4;
+  const eq = eqId();
+  if (eq === 'plan') { placeCurrent(); return; }
+  if (eq === 'door') { placeDoor(); return; }
+  if (eq === 'campfire') { placeFire(); return; }
+  if (aimedFire && (eq === 'wood' || eq === 'raw_meat')) { useFire(aimedFire); return; }
+  if (EAT[eq]) {
+    const e = EAT[eq];
+    if (removeItem(eq, 1)) {
+      stats.food = Math.min(100, stats.food + e.food); stats.hp = Math.min(100, stats.hp + e.hp);
+      toast('+' + e.food + ' сытости'); beep(700, 0.1, 'sine');
+      if (eq === 'cooked_meat') meme('Шашлычок! Вкусно', 'eatmeat');
+    }
+    return;
+  }
+  if (eq === 'beancan' || eq === 'satchel') { throwBomb(eq); return; }
+  if (!aimedPiece && net.on) { const rp = pickRemote(3.4); if (rp) { netSend({ t: 'hit', to: rp.id, dmg: DMG[eq || 'fist'] || 6 }); beep(200, 0.08, 'square', 0.08); toast('Попадание!'); return; } }
+  if (!aimedPiece) { const an = pickAnimal(3.4); if (an) { hurtAnimal(an, DMG[eq || 'fist'] || 6); return; } }
+  if (eq === 'hammer') { hammerHit(); return; }
+  if (aimedPiece && aimedPiece.door) { toggleDoor(aimedPiece); return; }
+  if (eq === null || TOOLS[eq]) harvestAim();
+}
+
+// ---------- Персонаж слева (E) ----------
+let charT = 0, bushUse = false;
+function charSVG(item, act) {
+  let g = '<svg viewBox="0 0 120 150" xmlns="http://www.w3.org/2000/svg">';
+  g += '<rect x="44" y="92" width="14" height="42" rx="3" fill="#2f3b55"/><rect x="62" y="92" width="14" height="42" rx="3" fill="#2f3b55"/>';
+  g += '<rect x="42" y="132" width="18" height="9" rx="3" fill="#3a2a1a"/><rect x="60" y="132" width="18" height="9" rx="3" fill="#3a2a1a"/>';
+  g += '<rect x="40" y="42" width="40" height="52" rx="8" fill="#c8442b"/><rect x="26" y="44" width="14" height="42" rx="6" fill="#a83a25"/>';
+  g += '<circle cx="60" cy="26" r="15" fill="#e0b48a"/><path d="M45 24 Q60 4 75 24 Q60 14 45 24Z" fill="#4a3526"/><circle cx="55" cy="27" r="1.8" fill="#222"/><circle cx="65" cy="27" r="1.8" fill="#222"/>';
+  g += '<g' + (act ? ' class="arm"' : '') + '><rect x="80" y="44" width="14" height="42" rx="6" fill="#a83a25"/><circle cx="87" cy="88" r="7" fill="#e0b48a"/>';
+  if (item && ICONS[item]) g += ICONS[item].replace('<svg ', '<svg x="76" y="70" width="34" height="34" ');
+  return g + '</g></svg>';
+}
+function showChar(label, item) {
+  const p = el('charPanel'); delete p.dataset.inv;
+  p.innerHTML = charSVG(item, true) + '<div class="cl">' + label + '</div>';
+  p.style.display = 'block'; charT = 1.8;
+}
+function updateCharPanel(dt) {
+  const p = el('charPanel');
+  if (uiOpen) {
+    if (!p.dataset.inv) { p.dataset.inv = '1'; p.innerHTML = charSVG(eqId(), false) + '<div class="cl">' + net.name + '</div>'; }
+    p.style.display = 'block'; charT = 0; return;
+  }
+  if (p.dataset.inv) { delete p.dataset.inv; p.style.display = 'none'; }
+  if (charT > 0) { charT -= dt; if (charT <= 0) p.style.display = 'none'; }
+}
+function gatherBerries() {
+  const o = aimed; if (!o || o.userData.type !== 'bush') return;
+  if (!o.userData.berries) { toast('Куст пуст'); return; }
+  showChar('Собираю ягоды…', 'berries');
+  bushUse = true; harvestAim(); bushUse = false;
+}
+
+// ---------- Рейд: бобовки и заряды ----------
+const BOMB = {
+  beancan: { fuse: 3, R: 3, pc: 45, pl: 45, an: 60, col: 0xb8b8b8 },
+  satchel: { fuse: 5, R: 4, pc: 220, pl: 110, an: 200, col: 0x6b4a2b }
+};
+const bombs = [], boomFx = [];
+function spawnBomb(kind, x, y, z, vx, vy, vz, local) {
+  const B = BOMB[kind]; if (!B) return;
+  const m = new THREE.Mesh(kind === 'beancan' ? new THREE.CylinderGeometry(0.09, 0.09, 0.2, 8) : new THREE.BoxGeometry(0.3, 0.22, 0.16), cmat(B.col));
+  m.position.set(x, y, z); scene.add(m);
+  bombs.push({ kind: kind, m: m, x: x, y: y, z: z, vx: vx, vy: vy, vz: vz, fuse: B.fuse, local: local });
+}
+function throwBomb(kind) {
+  if (!removeItem(kind, 1)) return;
+  const r = aimRay();
+  const x = r.ox + r.dx * 0.7, y = r.oy + r.dy * 0.7 - 0.2, z = r.oz + r.dz * 0.7;
+  const vx = r.dx * 13, vy = r.dy * 13 + 3.5, vz = r.dz * 13;
+  spawnBomb(kind, x, y, z, vx, vy, vz, true);
+  netSend({ t: 'throw', k: kind, x: x, y: y, z: z, vx: vx, vy: vy, vz: vz });
+  cd = 0.8; beep(260, 0.1, 'triangle');
+  if (kind === 'satchel') meme('Тут будет рейд', 'satchel1'); else meme('Бобовка вылетела. Кто не спрятался…', 'bean1');
+}
+function bombBlocked(x, y, z) {
+  for (const b of boxes) {
+    if (b.door && b.door.open) continue;
+    if (y > b.y0 && y < b.y1 && x > b.x0 - 0.1 && x < b.x1 + 0.1 && z > b.z0 - 0.1 && z < b.z1 + 0.1) return true;
+  }
+  for (const so of solids) { const u = so.userData; if (u.alive && Math.hypot(x - so.position.x, z - so.position.z) < u.r) return true; }
+  return false;
+}
+function updateBombs(dt) {
+  for (let i = bombs.length - 1; i >= 0; i--) {
+    const b = bombs[i];
+    b.vy -= 20 * dt;
+    const nx = b.x + b.vx * dt, ny = b.y + b.vy * dt, nz = b.z + b.vz * dt;
+    if (!bombBlocked(nx, b.y, b.z)) b.x = nx; else b.vx *= -0.3;
+    if (!bombBlocked(b.x, b.y, nz)) b.z = nz; else b.vz *= -0.3;
+    b.y = ny;
+    const g = groundAt(b.x, b.z, b.y + 0.3);
+    if (b.y < g + 0.12) { b.y = g + 0.12; if (b.vy < 0) b.vy *= -0.3; if (Math.abs(b.vy) < 1) b.vy = 0; b.vx *= 0.85; b.vz *= 0.85; }
+    b.m.position.set(b.x, b.y, b.z); b.m.rotation.x += dt * 6;
+    b.fuse -= dt;
+    if (b.fuse <= 0) {
+      scene.remove(b.m); bombs.splice(i, 1);
+      if (b.local) { netSend({ t: 'boom', k: b.kind, x: b.x, y: b.y, z: b.z }); applyBoom(b.kind, b.x, b.y, b.z, net.id); }
+    }
+  }
+  for (let i = boomFx.length - 1; i >= 0; i--) {
+    const f = boomFx[i]; f.t += dt;
+    f.m.scale.setScalar(1 + f.t * 6); f.m.material.opacity = Math.max(0, 0.8 - f.t * 1.6);
+    if (f.t > 0.5) { scene.remove(f.m); boomFx.splice(i, 1); }
+  }
+}
+function applyBoom(kind, x, y, z, by) {
+  const B = BOMB[kind]; if (!B) return;
+  const fx = new THREE.Mesh(new THREE.SphereGeometry(1, 12, 8), new THREE.MeshBasicMaterial({ color: 0xffa030, transparent: true, opacity: 0.8 }));
+  fx.position.set(x, y, z); scene.add(fx); boomFx.push({ m: fx, t: 0 });
+  beep(70, 0.5, 'sawtooth', 0.14); setTimeout(() => beep(45, 0.4, 'square', 0.1), 60);
+  const reach = B.R + 1.5, mine = !by || by === net.id;
+  let lost = 0, doors = 0;
+  for (const p of Array.from(pieces.values())) {
+    const gp = p.group.position;
+    const d = Math.hypot(gp.x - x, gp.y + 1 - y, gp.z - z);
+    if (d > reach) continue;
+    const dmg = B.pc * (1 - d / (reach + 1));
+    if (p.door) { p.door.hp -= dmg; if (p.door.hp <= 0) { removeDoor(p); doors++; } continue; }
+    p.hp -= dmg;
+    if (p.hp <= 0) { removePiece(p); lost++; }
+  }
+  if (lost) settle();
+  if (lost || doors) { toast(doors ? 'Дверь выбита!' : 'Постройка разрушена!'); if (mine) meme('Рейд удался. Сосед в шоке', 'raidok'); }
+  const pd = Math.hypot(player.pos.x - x, player.pos.y + 1 - y, player.pos.z - z);
+  if (pd < reach && !dead) {
+    stats.hp -= B.pl * (1 - pd / reach); hurtT = 1;
+    if (by && by !== net.id) { net.hitBy = by; net.hitT = performance.now(); }
+  }
+  if (mine) for (const a of animals) {
+    if (a.dead) continue;
+    const d = Math.hypot(a.x - x, a.g.position.y - y, a.z - z);
+    if (d < reach) hurtAnimal(a, B.an * (1 - d / reach));
+  }
+}
+
+// ---------- Мультиплеер (PeerJS, до 3 игроков) ----------
+const net = { on: false, host: false, id: null, peer: null, code: '', conns: [], players: new Map(), sendT: 0, name: 'Игрок', hitBy: null, hitT: 0 };
+function netInfo(text, err) {
+  const e = el('netInfo'); e.textContent = text; e.style.color = err ? '#ff8a80' : '#ffd24a';
+  if (err && !net.on) noSave = false;
+}
+function netSend(msg, except) {
+  if (!net.on) return;
+  if (!msg.from) msg.from = net.id;
+  for (const c of net.conns) if (c !== except && c.open) { try { c.send(msg); } catch (e) {} }
+}
+function keyOfT(t) {
+  if (t.type === 'foundation') return kF(t.i, t.j);
+  if (t.type === 'floor') return kL(t.i, t.j, t.k);
+  if (t.type === 'stairs') return kS(t.i, t.j, t.k);
+  return kE(t.o, t.i, t.j, t.k);
+}
+const pkey = p => keyOfT(p);
+function loadPeerLib(cb, errcb) {
+  if (window.Peer) { cb(); return; }
+  const urls = ['https://unpkg.com/peerjs@1.5.4/dist/peerjs.min.js', 'https://cdn.jsdelivr.net/npm/peerjs@1.5.4/dist/peerjs.min.js'];
+  let i = 0;
+  (function next() {
+    if (window.Peer) { cb(); return; }
+    if (i >= urls.length) { errcb(); return; }
+    const sc = document.createElement('script');
+    sc.onload = () => { if (window.Peer) cb(); else next(); };
+    sc.onerror = next;
+    sc.src = urls[i++]; document.head.appendChild(sc);
+  })();
+}
+function snapshot() {
+  return {
+    time: time,
+    pieces: Array.from(pieces.values()).map(p => ({ t: p.t, tier: p.tier, door: p.door ? (p.door.open ? 2 : 1) : 0, dhp: p.door ? p.door.hp : 0, hp: p.hp, placedAt: p.placedAt })),
+    fires: campfires.map(c => ({ x: c.x, z: c.z, y: c.y, fuel: c.fuel })),
+    deadT: targets.map((o, i) => (!o.userData.alive ? i : -1)).filter(i => i >= 0),
+    noBerry: targets.map((o, i) => (o.userData.type === 'bush' && !o.userData.berries ? i : -1)).filter(i => i >= 0)
+  };
+}
+function restorePieces(arr) {
+  for (const sv of (arr || [])) {
+    const p = createPiece(sv.t);
+    setTier(p, sv.tier || 0);
+    if (typeof sv.hp === 'number') p.hp = sv.hp;
+    p.placedAt = sv.placedAt || 0;
+    if (sv.door) {
+      addDoor(p);
+      if (typeof sv.dhp === 'number' && sv.dhp > 0) p.door.hp = sv.dhp;
+      if (sv.door === 2) { p.door.open = true; p.door.angle = Math.PI / 2; }
+    }
+  }
+}
+function applySnapshot(sn) {
+  if (typeof sn.time === 'number') time = sn.time;
+  restorePieces(sn.pieces);
+  for (const f of (sn.fires || [])) makeCampfire(f.x, f.z, f.fuel, f.y);
+  for (const i of (sn.deadT || [])) { const o = targets[i]; if (o && o.userData.alive) { o.userData.alive = false; scene.remove(o); setTimeout(() => respawnObj(o), 60000); } }
+  for (const i of (sn.noBerry || [])) {
+    const o = targets[i];
+    if (o) { o.userData.berries = false; o.userData.berryGroup.visible = false; setTimeout(() => { o.userData.berries = true; o.userData.berryGroup.visible = true; }, 30000); }
+  }
+}
+function netHost(done) {
+  loadPeerLib(() => {
+    let tries = 0;
+    const attempt = () => {
+      const code = Math.random().toString(36).replace(/[^a-z0-9]/g, '').slice(0, 4).toUpperCase();
+      if (code.length < 4) { attempt(); return; }
+      const peer = new Peer('wsurv-' + code);
+      peer.on('open', id => { net.peer = peer; net.id = id; net.on = true; net.host = true; net.code = code; done(code); });
+      peer.on('error', err => {
+        if (err.type === 'unavailable-id' && tries++ < 5) { try { peer.destroy(); } catch (e) {} attempt(); }
+        else netInfo('Не удалось создать комнату: ' + err.type, true);
+      });
+      peer.on('connection', conn => {
+        conn.on('open', () => {
+          if (net.conns.length >= 2) { conn.send({ t: 'full' }); setTimeout(() => conn.close(), 400); return; }
+          net.conns.push(conn);
+          conn.send({ t: 'state', from: net.id, snap: snapshot() });
+          toast('Игрок подключился');
+        });
+        conn.on('data', d => { netHandle(d); netSend(d, conn); });
+        conn.on('close', () => { net.conns = net.conns.filter(c => c !== conn); });
+      });
+    };
+    attempt();
+  }, () => netInfo('Не удалось загрузить сетевую библиотеку. Проверьте интернет.', true));
+}
+function netJoin(code, done) {
+  loadPeerLib(() => {
+    const peer = new Peer();
+    let opened = false;
+    const timer = setTimeout(() => { if (!opened) { netInfo('Нет ответа от комнаты. Проверьте код.', true); try { peer.destroy(); } catch (e) {} } }, 15000);
+    peer.on('error', err => { clearTimeout(timer); netInfo(err.type === 'peer-unavailable' ? 'Комната не найдена' : 'Ошибка сети: ' + err.type, true); });
+    peer.on('open', id => {
+      const conn = peer.connect('wsurv-' + code, { reliable: true });
+      conn.on('open', () => { opened = true; clearTimeout(timer); net.peer = peer; net.id = id; net.on = true; net.host = false; net.conns = [conn]; });
+      conn.on('data', d => { netHandle(d); if (d && d.t === 'state') done(); });
+      conn.on('close', () => { if (net.on) toast('Соединение с хостом потеряно'); });
+    });
+  }, () => netInfo('Не удалось загрузить сетевую библиотеку. Проверьте интернет.', true));
+}
+
+const SHIRT = [0xc8442b, 0x2d6aa8, 0x3a8a3a];
+const HELD_COL = { rock: 0x8a8780, hatchet: 0x9a9a9a, pickaxe: 0x9a9a9a, hammer: 0x7b7b7b, spear: 0xc4c4c4, plan: 0x2d6aa8, door: 0x9a6b3a,
+  campfire: 0xff8c1a, beancan: 0xb8b8b8, satchel: 0x6b4a2b, wood: 0x8b5a2b, stone: 0x8a8a8a, berries: 0xc8102e, raw_meat: 0xd94a5a, cooked_meat: 0x8a4b22 };
+function makeNameSprite(name) {
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+  const x = c.getContext('2d'); x.font = 'bold 34px system-ui, Arial'; x.textAlign = 'center';
+  x.lineWidth = 6; x.strokeStyle = '#000'; x.strokeText(name, 128, 44); x.fillStyle = '#fff'; x.fillText(name, 128, 44);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(c), transparent: true, depthTest: false }));
+  sp.scale.set(2.2, 0.55, 1); sp.position.y = 2.25; sp.renderOrder = 5; return sp;
+}
+function makeRemote(id, name) {
+  const g = new THREE.Group(), col = SHIRT[net.players.size % 3];
+  abox(g, 0.55, 0.75, 0.3, 0, 1.15, 0, col);
+  abox(g, 0.34, 0.34, 0.34, 0, 1.72, 0, 0xe0b48a);
+  abox(g, 0.36, 0.12, 0.36, 0, 1.92, 0, 0x4a3526);
+  abox(g, 0.22, 0.75, 0.25, -0.14, 0.4, 0, 0x2f3b55); abox(g, 0.22, 0.75, 0.25, 0.14, 0.4, 0, 0x2f3b55);
+  abox(g, 0.16, 0.65, 0.2, -0.38, 1.15, 0, col); abox(g, 0.16, 0.65, 0.2, 0.38, 1.15, 0, col);
+  const held = abox(g, 0.12, 0.3, 0.12, 0.38, 0.8, 0.25, 0x888888); held.visible = false;
+  g.add(makeNameSprite(name));
+  scene.add(g);
+  const rp = { id: id, name: name, g: g, held: held, x: 0, y: 0, z: 0, yaw: 0, tx: 0, ty: 0, tz: 0, tyaw: 0, seen: 0, init: false };
+  net.players.set(id, rp); return rp;
+}
+function updateRemotes(dt) {
+  const now = performance.now() / 1000;
+  for (const pair of Array.from(net.players)) {
+    const id = pair[0], rp = pair[1];
+    if (now - rp.seen > 10) { scene.remove(rp.g); net.players.delete(id); continue; }
+    const k = Math.min(1, dt * 12);
+    rp.x += (rp.tx - rp.x) * k; rp.y += (rp.ty - rp.y) * k; rp.z += (rp.tz - rp.z) * k;
+    let dy = rp.tyaw - rp.yaw; while (dy > Math.PI) dy -= Math.PI * 2; while (dy < -Math.PI) dy += Math.PI * 2;
+    rp.yaw += dy * k;
+    rp.g.position.set(rp.x, rp.y, rp.z); rp.g.rotation.y = rp.yaw + Math.PI;
+  }
+}
+function pickRemote(maxD) {
+  const r = aimRay(); let best = null, bd = 0.8;
+  for (const rp of net.players.values()) {
+    if (Math.hypot(rp.x - player.pos.x, rp.z - player.pos.z) > maxD) continue;
+    const dr = Math.min(dist2Ray(r, rp.x, rp.y + 1.0, rp.z), dist2Ray(r, rp.x, rp.y + 1.6, rp.z));
+    if (dr < bd) { bd = dr; best = rp; }
+  }
+  return best;
+}
+function netTick(dt) {
+  if (!net.on) return;
+  updateRemotes(dt);
+  net.sendT -= dt;
+  if (net.sendT <= 0) {
+    net.sendT = 0.066;
+    netSend({ t: 'pos', n: net.name, x: player.pos.x, y: player.pos.y, z: player.pos.z, yaw: player.yaw, eq: eqId() });
+  }
+}
+function killRemoteTarget(o) {
+  const u = o.userData; u.alive = false;
+  if (u.type === 'tree') falling.push({ o: o, t: 0 });
+  else { scene.remove(o); setTimeout(() => respawnObj(o), 90000); }
+}
+function netHandle(d) {
+  if (!d || !d.t) return;
+  switch (d.t) {
+    case 'state': applySnapshot(d.snap); break;
+    case 'full': netInfo('Комната заполнена (макс. 3 игрока)', true); net.on = false; try { net.peer.destroy(); } catch (e) {} break;
+    case 'pos': {
+      const rp = net.players.get(d.from) || makeRemote(d.from, d.n || 'Игрок');
+      rp.tx = d.x; rp.ty = d.y; rp.tz = d.z; rp.tyaw = d.yaw; rp.seen = performance.now() / 1000;
+      if (!rp.init) { rp.init = true; rp.x = d.x; rp.y = d.y; rp.z = d.z; rp.yaw = d.yaw; }
+      if (rp.eq !== d.eq) { rp.eq = d.eq; rp.held.visible = !!d.eq; if (d.eq) rp.held.material = cmat(HELD_COL[d.eq] || 0x888888); }
+      break;
+    }
+    case 'place': { if (!pieces.has(keyOfT(d.p))) createPiece(d.p); break; }
+    case 'door': {
+      const p = pieces.get(d.k); if (!p) break;
+      if (d.a === 'add') { if (!p.door) addDoor(p); } else if (p.door) p.door.open = !!d.open;
+      break;
+    }
+    case 'tier': { const p = pieces.get(d.k); if (p) setTier(p, d.tier); break; }
+    case 'rem': { const p = pieces.get(d.k); if (p) { removePiece(p); settle(); } break; }
+    case 'res': {
+      const o = targets[d.i]; if (!o) break;
+      const u = o.userData; u.hp = d.hp; u.shake = 0.25;
+      if (d.dead && u.alive) killRemoteTarget(o);
+      break;
+    }
+    case 'berry': {
+      const o = targets[d.i]; if (!o) break;
+      const u = o.userData; u.berries = false; u.berryGroup.visible = false;
+      setTimeout(() => { u.berries = true; u.berryGroup.visible = true; }, 40000);
+      break;
+    }
+    case 'fire': makeCampfire(d.x, d.z, d.fuel, d.y); break;
+    case 'throw': spawnBomb(d.k, d.x, d.y, d.z, d.vx, d.vy, d.vz, false); break;
+    case 'boom': applyBoom(d.k, d.x, d.y, d.z, d.from); break;
+    case 'hit':
+      if (d.to === net.id && !dead) { stats.hp -= d.dmg; hurtT = 1; net.hitBy = d.from; net.hitT = performance.now(); beep(160, 0.12, 'sawtooth', 0.09); }
+      break;
+    case 'killed':
+      if (d.by === net.id) { toast('Вы убили игрока ' + d.victim); meme('Ты убил игрока ' + d.victim + '. Респект?'); }
+      else toast(d.victim + ' погиб');
+      break;
+  }
+}
+
+// ---------- Мемы ----------
+const memeFlags = {};
+const memeEl = el('memeBig');
+function memeSound() { beep(220, 0.08, 'square', 0.07); setTimeout(() => beep(165, 0.08, 'square', 0.07), 90); setTimeout(() => beep(110, 0.25, 'sawtooth', 0.08), 180); }
+function bruh() { beep(150, 0.12, 'sawtooth', 0.08); setTimeout(() => beep(90, 0.35, 'sawtooth', 0.09), 130); }
+function meme(text, once) {
+  if (once) { if (memeFlags[once]) return; memeFlags[once] = 1; }
+  memeEl.textContent = text;
+  memeEl.classList.remove('show'); void memeEl.offsetWidth; memeEl.classList.add('show');
+  memeSound();
+}
+const PIECE_MEME = { foundation: 'Фундамент заложен. Ипотека не нужна!', wall: 'Стена. Нет, не Берлинская', doorway: 'Проём в светлое будущее',
+  window: 'Окно в Европу', floor: 'Второй этаж? Да ты барин', stairs: 'Лестница в небо' };
+const CRAFT_MEME = { plan: 'План есть. Осталось найти бюджет', hammer: 'Ну всё, я бог стройки', door: 'Скрип-скрип. Дом почти готов',
+  hatchet: 'Дровосек-сигма активирован', pickaxe: 'Гном-шахтёр на связи', spear: 'Копьё. Каменный век, но с характером', campfire: 'Шашлык-машлык!', beancan: 'Бобовки. Сосед, ты следующий', satchel: 'Сумка с сюрпризом. Рейд-мастер' };
+const DEATH_MEMES = ['Скилл ишью', 'Не повезло, не повезло…', 'Это было неизбежно', 'Ну и как оно, внизу?', 'Респаун через 3… 2… 1…', 'Wasted. Но по-русски'];
+const IDLE_MEMES = ['Ты точно не в Роблоксе?', 'Где-то плачет бухгалтер', 'Лес принял тебя. Пока что', 'Сегодня ты — сигма-дровосек',
+  'Ни дня без дров', 'Руби, пока рубится', 'Интернета нет, но ты держись'];
+const EAT = { berries: { food: 25, hp: 0 }, raw_meat: { food: 12, hp: 0 }, cooked_meat: { food: 40, hp: 10 } };
+const ANIMAL_NAME = { boar: 'Кабан', wolf: 'Волк' };
+
+// ---------- Животные ----------
+const cmatCache = {};
+function cmat(c) { return cmatCache[c] || (cmatCache[c] = new THREE.MeshLambertMaterial({ color: c })); }
+function abox(g, w, hh, d, x, y, z, c) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(w, hh, d), cmat(c));
+  m.position.set(x, y, z); m.castShadow = !isMobile; g.add(m); return m;
+}
+function makeBoarMesh() {
+  const g = new THREE.Group();
+  abox(g, 0.9, 0.75, 1.5, 0, 0.8, 0, 0x6b4f3a);
+  abox(g, 0.6, 0.55, 0.6, 0, 0.85, 0.95, 0x5a4130);
+  abox(g, 0.34, 0.24, 0.26, 0, 0.75, 1.3, 0xc99a88);
+  abox(g, 0.06, 0.16, 0.06, -0.16, 0.8, 1.3, 0xeeeeee); abox(g, 0.06, 0.16, 0.06, 0.16, 0.8, 1.3, 0xeeeeee);
+  for (const lx of [-0.3, 0.3]) for (const lz of [-0.5, 0.5]) abox(g, 0.2, 0.45, 0.2, lx, 0.22, lz, 0x4a3526);
+  return g;
+}
+function makeWolfMesh() {
+  const g = new THREE.Group();
+  abox(g, 0.55, 0.6, 1.3, 0, 0.85, 0, 0x8a8d93);
+  abox(g, 0.45, 0.4, 0.5, 0, 1.0, 0.85, 0x7a7d83);
+  abox(g, 0.2, 0.2, 0.3, 0, 0.92, 1.2, 0x55585d);
+  abox(g, 0.1, 0.14, 0.06, -0.15, 1.28, 0.8, 0x55585d); abox(g, 0.1, 0.14, 0.06, 0.15, 1.28, 0.8, 0x55585d);
+  abox(g, 0.05, 0.05, 0.05, -0.12, 1.06, 1.1, 0xff3030); abox(g, 0.05, 0.05, 0.05, 0.12, 1.06, 1.1, 0xff3030);
+  abox(g, 0.15, 0.15, 0.6, 0, 0.95, -0.9, 0x7a7d83);
+  for (const lx of [-0.18, 0.18]) for (const lz of [-0.45, 0.45]) abox(g, 0.15, 0.6, 0.15, lx, 0.3, lz, 0x6a6d73);
+  return g;
+}
+const animals = [];
+function spawnAnimal(kind, minD) {
+  let x, z, tries = 0;
+  do { x = rr(-175, 175); z = rr(-175, 175); tries++; } while (Math.hypot(x, z) < minD && tries < 30);
+  const g = kind === 'wolf' ? makeWolfMesh() : makeBoarMesh();
+  const hp = kind === 'wolf' ? 60 : 50;
+  const a = { kind: kind, g: g, x: x, z: z, yaw: rr(0, 6.28), hp: hp, max: hp, dead: false, deadT: 0, respT: 60, cd: 0, wt: 0, moving: false, flee: 0, angry: 0, t: rr(0, 10) };
+  g.position.set(x, h(x, z), z); g.rotation.y = a.yaw;
+  scene.add(g); animals.push(a); return a;
+}
+for (let i = 0; i < 14; i++) spawnAnimal('boar', 20);
+for (let i = 0; i < 7; i++) spawnAnimal('wolf', 40);
+
+function animalBlocked(x, z) {
+  const gy = h(x, z);
+  for (const b of boxes) {
+    if (b.door && b.door.open) continue;
+    if (b.y0 > gy + 2) continue;
+    if (x > b.x0 - 0.5 && x < b.x1 + 0.5 && z > b.z0 - 0.5 && z < b.z1 + 0.5) return true;
+  }
+  for (const s of solids) {
+    const u = s.userData; if (!u.alive) continue;
+    if (Math.hypot(x - s.position.x, z - s.position.z) < u.r + 0.5) return true;
+  }
+  return false;
+}
+function reviveAnimal(a) {
+  let x, z, tries = 0;
+  do { x = rr(-175, 175); z = rr(-175, 175); tries++; } while (Math.hypot(x - player.pos.x, z - player.pos.z) < 35 && tries < 30);
+  a.x = x; a.z = z; a.hp = a.max; a.dead = false; a.deadT = 0; a.angry = 0; a.flee = 0; a.g.visible = true; a.g.rotation.z = 0;
+}
+let hurtT = 0;
+function updateAnimal(a, dt, night) {
+  const g = a.g;
+  if (a.dead) {
+    a.deadT += dt;
+    g.rotation.z = Math.min(1, a.deadT * 3) * 1.5;
+    if (a.deadT > 2.5 && g.visible) g.visible = false;
+    a.respT -= dt;
+    if (a.respT <= 0) reviveAnimal(a);
+    return;
+  }
+  const dx = player.pos.x - a.x, dz = player.pos.z - a.z, d = Math.hypot(dx, dz);
+  if (d > 95) return;
+  a.cd -= dt; a.t += dt;
+  let sp = 0;
+  if (a.flee > 0) {
+    a.flee -= dt; a.yaw = Math.atan2(-dx, -dz); sp = 8;
+  } else if (a.kind === 'wolf' && !dead && (d < (night ? 28 : 13) || a.angry > 0) && d < 50) {
+    a.angry = Math.max(0, a.angry - dt);
+    a.yaw = Math.atan2(dx, dz);
+    if (d > 1.5) sp = night ? 7.5 : 6.5;
+    else if (a.cd <= 0 && Math.abs(player.pos.y - g.position.y) < 2.5) {
+      a.cd = 1.3; stats.hp -= 8; hurtT = 1; beep(120, 0.15, 'sawtooth', 0.09);
+      meme('Волк: «Я просто хотел поговорить»', 'wolfbite');
+    }
+  } else {
+    a.angry = Math.max(0, a.angry - dt);
+    a.wt -= dt;
+    if (a.wt <= 0) { a.wt = rr(2, 6); a.moving = rand() < 0.6; a.yaw = rr(0, 6.28); }
+    if (a.moving) sp = 1.5;
+  }
+  if (sp > 0) {
+    const sx = Math.sin(a.yaw) * sp * dt, sz = Math.cos(a.yaw) * sp * dt;
+    if (!animalBlocked(a.x + sx, a.z + sz)) { a.x += sx; a.z += sz; }
+    else if (!animalBlocked(a.x + sx, a.z)) a.x += sx;
+    else if (!animalBlocked(a.x, a.z + sz)) a.z += sz;
+    else a.wt = 0;
+    a.x = clamp(a.x, -190, 190); a.z = clamp(a.z, -190, 190);
+  }
+  g.position.set(a.x, h(a.x, a.z) + (sp > 0 ? Math.abs(Math.sin(a.t * 12)) * 0.07 : 0), a.z);
+  g.rotation.y = a.yaw;
+}
+function pickAnimal(maxD) {
+  const r = aimRay(); let best = null, bd = 1.1;
+  for (const a of animals) {
+    if (a.dead) continue;
+    if (Math.hypot(a.x - player.pos.x, a.z - player.pos.z) > maxD) continue;
+    const dr = dist2Ray(r, a.x, a.g.position.y + 0.7, a.z);
+    if (dr < bd) { bd = dr; best = a; }
+  }
+  return best;
+}
+function hurtAnimal(a, dmg) {
+  a.hp -= dmg; beep(200, 0.08, 'square', 0.08);
+  if (a.kind === 'boar') a.flee = 6; else a.angry = 10;
+  const dx = a.x - player.pos.x, dz = a.z - player.pos.z, d = Math.hypot(dx, dz) || 1;
+  const nx = a.x + dx / d * 0.8, nz = a.z + dz / d * 0.8;
+  if (!animalBlocked(nx, nz)) { a.x = nx; a.z = nz; }
+  if (a.hp <= 0) {
+    a.hp = 0; a.dead = true; a.deadT = 0; a.respT = 60;
+    giveRes('raw_meat', a.kind === 'wolf' ? 3 : 4);
+    if (a.kind === 'wolf') meme('Ты сегодня сигма. Волк — нет', 'killwolf');
+    else meme('Кабан Валера ушёл на покой', 'killboar');
+  }
+}
+
+// ---------- Костры ----------
+const campfires = [];
+function makeCampfire(x, z, fuel, y) {
+  const g = new THREE.Group();
+  for (let i = 0; i < 4; i++) {
+    const m = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 1, 6), cmat(0x5a3a1a));
+    m.rotation.z = Math.PI / 2; m.rotation.y = i * Math.PI / 4; m.position.y = 0.12; g.add(m);
+  }
+  for (let i = 0; i < 8; i++) {
+    const m = new THREE.Mesh(new THREE.DodecahedronGeometry(0.16, 0), cmat(0x777777));
+    m.position.set(Math.cos(i * 0.785) * 0.6, 0.1, Math.sin(i * 0.785) * 0.6); g.add(m);
+  }
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.3, 0.85, 6), new THREE.MeshBasicMaterial({ color: 0xff8c1a, transparent: true, opacity: 0.9 }));
+  flame.position.y = 0.6; g.add(flame);
+  const flame2 = new THREE.Mesh(new THREE.ConeGeometry(0.17, 0.55, 6), new THREE.MeshBasicMaterial({ color: 0xffe066 }));
+  flame2.position.y = 0.45; g.add(flame2);
+  const c = { g: g, x: x, z: z, y: y, fuel: fuel, flame: flame, flame2: flame2, light: null, cook: [] };
+  if (campfires.length < 3) { const l = new THREE.PointLight(0xff9a3c, 1.2, 16); l.position.y = 1; g.add(l); c.light = l; }
+  g.position.set(x, y, z);
+  scene.add(g); campfires.push(c); return c;
+}
+function placeFire() {
+  const g = aimGround(aimRay(), 6);
+  if (!g) { toast('Нет места'); return; }
+  if (!removeItem('campfire', 1)) return;
+  makeCampfire(g.x, g.z, 180, g.y); netSend({ t: 'fire', x: g.x, z: g.z, y: g.y, fuel: 180 });
+  toast('Костёр разожжён'); beep(300, 0.15, 'triangle'); meme('Шашлык-машлык!', 'fire1');
+}
+function pickFire() {
+  const r = aimRay(); let best = null, bd = 1.0;
+  for (const c of campfires) {
+    if (Math.hypot(c.x - player.pos.x, c.z - player.pos.z) > 4.5) continue;
+    const dr = dist2Ray(r, c.x, c.y + 0.4, c.z);
+    if (dr < bd) { bd = dr; best = c; }
+  }
+  return best;
+}
+function useFire(c) {
+  const raw = countItem('raw_meat');
+  if (raw > 0 && c.fuel > 0) {
+    const n = Math.min(raw, 6 - c.cook.length);
+    if (n <= 0) { toast('Костёр занят'); return; }
+    removeItem('raw_meat', n);
+    for (let i = 0; i < n; i++) c.cook.push(6);
+    toast('Жарится мяса: ' + n); beep(500, 0.08, 'sine');
+  } else if (countItem('wood') >= 10) {
+    removeItem('wood', 10); c.fuel = Math.min(600, c.fuel + 60);
+    toast('Дров подкинуто (+60 с)'); beep(260, 0.08, 'square');
+  } else if (raw > 0) toast('Костёр потух: подкиньте 10 дерева');
+  else toast('Нужно 10 дерева или сырое мясо');
+}
+function updateFire(c, dt, day) {
+  const lit = c.fuel > 0;
+  if (lit) c.fuel -= dt;
+  c.flame.visible = lit; c.flame2.visible = lit;
+  const f = 1 + Math.sin(time * 18 + c.x) * 0.12 + Math.sin(time * 31 + c.z) * 0.08;
+  c.flame.scale.set(f, f * 1.1, f); c.flame2.scale.set(f * 0.9, f * 1.2, f * 0.9);
+  if (c.light) c.light.intensity = lit ? (0.8 + (1 - day) * 1.6) * f : 0;
+  if (lit) for (let i = c.cook.length - 1; i >= 0; i--) {
+    c.cook[i] -= dt;
+    if (c.cook[i] <= 0) {
+      c.cook.splice(i, 1);
+      if (addItem('cooked_meat', 1, true) > 0) toast('Инвентарь полон'); else { toast('Готово: жареное мясо'); beep(800, 0.1, 'triangle'); }
+    }
+  }
+}
+
+// ---------- Мир: животные, костры, мемы, автосохранение ----------
+let saveT = 0, prevDay = 1, idleT = 0;
+function updateWorldLife(dt, day) {
+  const night = day < 0.35;
+  for (const a of animals) updateAnimal(a, dt, night);
+  for (const c of campfires) updateFire(c, dt, day);
+  if (prevDay >= 0.3 && day < 0.3) meme('Ночь. Волки голодные. Ты тоже.');
+  if (prevDay < 0.6 && day >= 0.6) meme('Рассвет. Ты выжил. Респект.');
+  prevDay = day;
+  if (stats.food < 20) meme('Желудок исполняет Реквием', 'hungry'); else if (stats.food > 50) memeFlags.hungry = 0;
+  idleT += dt;
+  if (idleT > 100 && !uiOpen && !dead) { idleT = 0; meme(IDLE_MEMES[(Math.random() * IDLE_MEMES.length) | 0]); }
+  if (hurtT > 0) { el('hurt').style.opacity = Math.min(1, hurtT) * 0.6; hurtT = Math.max(0, hurtT - dt * 1.5); if (hurtT === 0) el('hurt').style.opacity = 0; }
+  saveT += dt;
+  if (saveT > 15) { saveT = 0; saveGame(); }
+}
+
+// ---------- Подсказки ----------
+let lastPrompt = '';
+function setPrompt(html) { if (html !== lastPrompt) { lastPrompt = html; el('prompt').innerHTML = html; } }
+function updatePrompt(target, afford) {
+  const eq = eqId();
+  if (uiOpen) { setPrompt(''); return; }
+  if ((eq === 'beancan' || eq === 'satchel') && !aimedPiece) { setPrompt(ITEMS[eq].name + '<br><small>' + (isMobile ? 'ДЕЙСТВИЕ' : 'ЛКМ') + ' — бросить</small>'); return; }
+  if (eq !== 'plan') {
+    if (aimedFire) { const c = aimedFire; setPrompt('Костёр — ' + (c.fuel > 0 ? 'горит ещё ' + Math.ceil(c.fuel) + ' с' : 'потух') + '<br><small>' + (isMobile ? 'ИСПОЛЬЗ.' : 'E') + ' — готовить мясо / подкинуть дров (10 дерева)</small>'); return; }
+    if (aimAnimal) { setPrompt(ANIMAL_NAME[aimAnimal.kind] + ' (' + Math.max(0, Math.ceil(aimAnimal.hp)) + '/' + aimAnimal.max + ')'); return; }
+  }
+  if (eq === 'plan') {
+    const pc = PIECES[pieceIdx];
+    if (!target) setPrompt(pc.name + '<br><small>Наведите на землю или на дом</small>');
+    else if (!target.valid) setPrompt('<span class="bad">' + pc.name + ': ' + (target.reason || 'сюда нельзя') + '</span>');
+    else setPrompt('<span class="' + (afford ? 'ok' : 'bad') + '">' + pc.name + ' — ' + PLACE_COST + ' дерева</span><br><small>' + (isMobile ? 'ДЕЙСТВИЕ — построить' : 'ЛКМ — построить') + '</small>');
+    return;
+  }
+  if (aimedPiece) {
+    const p = aimedPiece, nm = PIECES.find(x => x.id === p.type).name + ' [' + TIER_NAMES[p.tier] + '] · HP ' + Math.ceil(p.door ? p.door.hp : p.hp) + '/' + (p.door ? 250 : hpFor(p));
+    if (eq === 'hammer') {
+      if (p.tier < 2) setPrompt(nm + '<br><small>' + (isMobile ? 'ДЕЙСТВИЕ' : 'ЛКМ') + ' — улучшить до «' + TIER_NAMES[p.tier + 1] + '» (' + UPG[p.tier + 1][p.type] + ' ' + RES_NAME[TIER_RES[p.tier + 1]] + ') · ' + (isMobile ? 'СНЕСТИ' : 'X — снести') + '</small>');
+      else setPrompt(nm + '<br><small>' + (isMobile ? 'СНЕСТИ' : 'X — снести') + '</small>');
+    } else if (eq === 'door' && p.type === 'doorway' && !p.door) setPrompt(nm + '<br><small>Поставить дверь</small>');
+    else if (p.door) setPrompt('Дверь<br><small>' + (isMobile ? 'ИСПОЛЬЗ.' : 'E') + ' — открыть / закрыть</small>');
+    else if (p.type === 'doorway') setPrompt(nm + '<br><small>Возьмите дверь в руки, чтобы поставить</small>');
+    else setPrompt(nm);
+    return;
+  }
+  if (aimed) {
+    const u = aimed.userData;
+    if (u.type === 'bush') setPrompt(u.berries ? 'Куст с ягодами<br><small>' + (isMobile ? 'ИСПОЛЬЗ.' : 'E') + ' — собрать ягоды</small>' : 'Куст пуст');
+    else setPrompt(u.name + ' (' + u.hp + '/' + u.max + ')');
+    return;
+  }
+  setPrompt('');
+}
+
+// ---------- Цикл ----------
+const clock = new THREE.Clock();
+const colNight = new THREE.Color(0x060a1a), colDay = new THREE.Color(0x87b4d8), colDusk = new THREE.Color(0xe0875a), tmp = new THREE.Color();
+const hpBar = el('hp'), foodBar = el('food');
+let lastEq = '#', lastSel = -1;
+
+function onEquipChange() {
+  const eq = eqId();
+  for (const id in hand) hand[id].visible = (id === eq);
+  document.body.classList.toggle('hold-plan', eq === 'plan');
+  document.body.classList.toggle('hold-hammer', eq === 'hammer');
+  el('buildPanel').style.display = eq === 'plan' ? 'block' : 'none';
+  if (eq === 'plan') renderBuildPanel();
+  if (eq !== 'plan') updateGhost(null);
+}
+
+function collideBoxes() {
+  const r = 0.4, py = player.pos.y;
+  for (const b of boxes) {
+    if (b.door && b.door.open) continue;
+    if (!(py + 1.7 > b.y0 && py < b.y1 - b.step)) continue;
+    const cx = clamp(player.pos.x, b.x0, b.x1), cz = clamp(player.pos.z, b.z0, b.z1);
+    const dx = player.pos.x - cx, dz = player.pos.z - cz, d2 = dx * dx + dz * dz;
+    if (d2 < r * r) {
+      if (d2 > 1e-8) { const d = Math.sqrt(d2), k = (r - d) / d; player.pos.x += dx * k; player.pos.z += dz * k; }
+      else {
+        const l = player.pos.x - b.x0, rt = b.x1 - player.pos.x, tp = player.pos.z - b.z0, bt = b.z1 - player.pos.z, m = Math.min(l, rt, tp, bt);
+        if (m === l) player.pos.x = b.x0 - r; else if (m === rt) player.pos.x = b.x1 + r; else if (m === tp) player.pos.z = b.z0 - r; else player.pos.z = b.z1 + r;
+      }
+    }
+  }
+}
+
+function update(dt) {
+  time += dt;
+
+  // Движение
+  let ix = 0, iz = 0;
+  if (!uiOpen && !dead) { ix = (keys.KeyD ? 1 : 0) - (keys.KeyA ? 1 : 0) + joy.x; iz = (keys.KeyW ? 1 : 0) - (keys.KeyS ? 1 : 0) - joy.y; }
+  const il = Math.hypot(ix, iz); if (il > 1) { ix /= il; iz /= il; }
+  sprint = !!(keys.ShiftLeft || keys.ShiftRight) || (isMobile && il > 0.9);
+  const speed = sprint ? 8 : 5;
+  const sy = Math.sin(player.yaw), cy = Math.cos(player.yaw);
+  player.pos.x += (ix*cy - iz*sy) * speed * dt; player.pos.z += (-ix*sy - iz*cy) * speed * dt;
+  player.pos.x = clamp(player.pos.x, -190, 190); player.pos.z = clamp(player.pos.z, -190, 190);
+
+  // Коллизии: деревья/камни и части дома
+  for (let k = 0; k < 2; k++) {
+    for (const s of solids) {
+      const u = s.userData; if (!u.alive) continue;
+      const dx = player.pos.x - s.position.x, dz = player.pos.z - s.position.z, d = Math.hypot(dx, dz), min = u.r + 0.45;
+      if (d < min && d > 0.0001) { player.pos.x = s.position.x + dx/d*min; player.pos.z = s.position.z + dz/d*min; }
+    }
+    collideBoxes();
+  }
+
+  // Прыжок, гравитация, ступени
+  let gy = groundAt(player.pos.x, player.pos.z, player.pos.y);
+  if (player.onGround && player.vy <= 0 && gy <= player.pos.y && player.pos.y - gy <= STEP) player.pos.y = gy;
+  if (jumpReq && player.onGround && !dead && !uiOpen) { player.vy = 8.5; player.onGround = false; }
+  jumpReq = false;
+  player.vy -= 25*dt; player.pos.y += player.vy*dt;
+  gy = groundAt(player.pos.x, player.pos.z, player.pos.y);
+  if (player.vy <= 0 && player.pos.y <= gy) { player.pos.y = gy; player.vy = 0; player.onGround = true; }
+  else if (player.pos.y > gy + 0.02) player.onGround = false;
+
+  // Камера
+  const bob = (player.onGround && il > 0.1) ? Math.sin(time*(sprint ? 14 : 10)) * 0.04 : 0;
+  camera.position.set(player.pos.x, player.pos.y + 1.7 + bob, player.pos.z);
+  camera.rotation.set(player.pitch, player.yaw, 0);
+  camera.updateMatrixWorld();
+
+  // Смена предмета в руке
+  const eq = eqId();
+  if (eq !== lastEq || sel !== lastSel) { lastEq = eq; lastSel = sel; onEquipChange(); }
+
+  updateAim();
+
+  aimedFire = pickFire(); aimAnimal = pickAnimal(5);
+
+  // Строительство: предпросмотр
+  let target = null, afford = true;
+  if (eq === 'plan' && !uiOpen) {
+    target = currentTarget(); afford = countItem('wood') >= PLACE_COST;
+    updateGhost(target, afford);
+  } else if (eq === 'plan') updateGhost(null);
+
+  // Действия
+  cd -= dt;
+  if (!dead && !uiOpen) {
+    if (partReq && eq === 'plan') { pieceIdx = (pieceIdx + 1) % PIECES.length; renderBuildPanel(); }
+    if (rotReq && eq === 'plan') stairRot = (stairRot + 1) % 4;
+    if (useReq && aimedPiece && aimedPiece.door) { showChar('Открываю дверь', 'door'); toggleDoor(aimedPiece); }
+    else if (useReq && aimedFire) { showChar('Готовлю на костре', 'raw_meat'); useFire(aimedFire); }
+    else if (useReq && aimed && aimed.userData.type === 'bush') gatherBerries();
+    if (demoReq && eq === 'hammer') demolish();
+    const repeat = attackHeld && eq !== 'plan' && eq !== 'door' && eq !== 'hammer' && eq !== 'campfire' && !EAT[eq] && eq !== 'wood' && eq !== 'stone' && eq !== 'beancan' && eq !== 'satchel';
+    if (cd <= 0 && (pendingAttack || repeat)) primary();
+  }
+  pendingAttack = false; partReq = rotReq = useReq = demoReq = false;
+  swing = Math.max(0, swing - dt/0.35);
+  tool.rotation.set(-0.25 - Math.sin(swing*Math.PI)*1.2, 0.25, -0.2);
+  updatePrompt(target, afford);
+
+  // Двери
+  for (const p of pieces.values()) if (p.door) {
+    const want = p.door.open ? Math.PI/2 : 0;
+    p.door.angle += (want - p.door.angle) * Math.min(1, dt*8);
+    p.door.pivot.rotation.y = -p.door.angle;
+  }
+
+  // Тряска и падающие деревья
+  for (const o of targets) {
+    const u = o.userData;
+    if (u.shake > 0) { u.shake = Math.max(0, u.shake - dt*0.8); o.rotation.z = Math.sin(time*55)*u.shake*0.3; }
+  }
+  for (let i = falling.length - 1; i >= 0; i--) {
+    const f = falling[i]; f.t += dt;
+    f.o.rotation.x = Math.pow(Math.min(1, f.t/1.1), 2) * (Math.PI/2);
+    if (f.t > 1.4) { scene.remove(f.o); const oo = f.o; setTimeout(() => respawnObj(oo), 60000); falling.splice(i, 1); }
+  }
+
+  // Выживание
+  if (!dead) {
+    stats.food = Math.max(0, stats.food - dt*0.4);
+    if (stats.food <= 0) stats.hp -= dt*2;
+    else if (stats.food > 50) stats.hp = Math.min(100, stats.hp + dt*0.6);
+    if (stats.hp <= 0) {
+      dead = true; stats.hp = 0;
+      if (uiOpen) closeUI();
+      el('dead').style.display = 'flex';
+      el('deadSub').textContent = DEATH_MEMES[(Math.random() * DEATH_MEMES.length) | 0]; bruh();
+      if (net.on && net.hitBy && performance.now() - net.hitT < 15000) netSend({ t: 'killed', by: net.hitBy, victim: net.name });
+      net.hitBy = null;
+      setTimeout(respawn, 3000);
+    }
+  }
+
+  // День / ночь
+  const a = (0.15 + time/300) * Math.PI*2, sunH = Math.sin(a);
+  const day = clamp(sunH*2 + 0.5, 0, 1);
+  tmp.copy(colNight).lerp(colDay, day);
+  if (Math.abs(sunH) < 0.25) tmp.lerp(colDusk, (1 - Math.abs(sunH)/0.25) * 0.35);
+  scene.background.copy(tmp); scene.fog.color.copy(tmp);
+  sun.intensity = 0.95*day; hemi.intensity = 0.22 + 0.5*day;
+  sun.position.set(player.pos.x + Math.cos(a)*70, player.pos.y + Math.abs(sunH)*70 + 12, player.pos.z + 30);
+  sun.target.position.copy(player.pos);
+  updateWorldLife(dt, day);
+  updateBombs(dt); netTick(dt); updateCharPanel(dt);
+
+  // HUD
+  hpBar.style.width = stats.hp + '%'; foodBar.style.width = stats.food + '%';
+}
+
+function frameUI(dt) {
+  updateQueue(dt);
+  if (uiDirty) {
+    uiDirty = false;
+    renderHotbar();
+    if (uiOpen) { renderBag(); if (uiMode === 'craft') renderCraft(); }
+  }
+}
+
+function loop() {
+  requestAnimationFrame(loop);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (!paused) { update(dt); frameUI(dt); }
+  else { camera.position.set(player.pos.x, player.pos.y + 1.7, player.pos.z); camera.rotation.set(player.pitch, player.yaw, 0); if (net.on) { updateBombs(dt); netTick(dt); } }
+  renderer.render(scene, camera);
+}
+loop();
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth/innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+
+renderHotbar();
+onEquipChange();
+
+// ---------- Сохранение ----------
+const SAVE_KEY = 'wildSurvivalSave_v1';
+let noSave = false;
+function saveGame() {
+  if (noSave || dead || !started) return;
+  try {
+    const data = {
+      inv: inv, stats: stats, pos: [player.pos.x, player.pos.y, player.pos.z], yaw: player.yaw, time: time, flags: memeFlags,
+      pieces: snapshot().pieces,
+      fires: campfires.map(c => ({ x: c.x, z: c.z, y: c.y, fuel: c.fuel }))
+    };
+    localStorage.setItem(SAVE_KEY, JSON.stringify(data));
+  } catch (e) {}
+}
+function loadGame() {
+  let d = null;
+  try { d = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch (e) { d = null; }
+  if (!d) return false;
+  try {
+    if (Array.isArray(d.inv)) for (let i = 0; i < 30; i++) {
+      const sv = d.inv[i];
+      inv[i] = (sv && ITEMS[sv.id] && sv.n > 0) ? { id: sv.id, n: Math.min(sv.n, ITEMS[sv.id].stack) } : null;
+    }
+    if (d.stats) { stats.hp = clamp(+d.stats.hp || 100, 1, 100); stats.food = clamp(+d.stats.food || 100, 0, 100); }
+    if (d.pos) { player.pos.set(+d.pos[0] || 0, (+d.pos[1] || 0) + 0.2, +d.pos[2] || 0); player.yaw = +d.yaw || 0; }
+    if (typeof d.time === 'number') time = d.time;
+    if (d.flags) Object.assign(memeFlags, d.flags);
+    restorePieces(d.pieces);
+    for (const f of (d.fires || [])) makeCampfire(f.x, f.z, f.fuel, f.y);
+  } catch (e) { console.error('load error', e); }
+  uiDirty = true;
+  return true;
+}
+addEventListener('beforeunload', saveGame);
+document.addEventListener('visibilitychange', () => { if (document.hidden) saveGame(); });
+el('resetSave').addEventListener('click', e => {
+  e.stopPropagation();
+  if (confirm('Удалить сохранение и начать заново?')) { noSave = true; try { localStorage.removeItem(SAVE_KEY); } catch (er) {} location.reload(); }
+});
+el('resetSave').addEventListener('touchend', e => { e.stopPropagation(); }, { passive: true });
+
+// Отладочный доступ (для проверок)
+window.__game = {
+  pieces: pieces, inv: inv, stats: stats, player: player, boxes: boxes, queue: queue,
+  computeTarget: computeTarget, createPiece: createPiece, settle: settle, groundAt: groundAt, collideBoxes: collideBoxes,
+  addItem: addItem, removeItem: removeItem, countItem: countItem, queueCraft: queueCraft, updateQueue: updateQueue,
+  addDoor: addDoor, setTier: setTier, evalFoundation: evalFoundation, step: function (dt) { paused = false; started = true; update(dt); frameUI(dt); },
+  setSel: function (n) { sel = n; uiDirty = true; }, getAimed: function () { return aimedPiece; },
+  setAimedPiece: function (p) { aimedPiece = p; }, hammerHit: hammerHit, demolish: demolish, placeCurrent: placeCurrent,
+  setPieceIdx: function (n) { pieceIdx = n; }, getTime: function () { return time; },
+  animals: animals, campfires: campfires, makeCampfire: makeCampfire, useFire: useFire, hurtAnimal: hurtAnimal, saveGame: saveGame, meme: meme, placeFire: placeFire, pickAnimal: pickAnimal, primary: primary
+};
+
+// Всё готово
+msgEl.style.display = 'none';
+showMenu('main');
+};
+})();
+</script>
+
+<!-- ===================== ЗАГРУЗЧИК THREE.JS ===================== -->
+<script>
+(function () {
+  var urls = [
+    'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
+    'https://cdn.jsdelivr.net/npm/three@0.128.0/build/three.min.js',
+    'https://unpkg.com/three@0.128.0/build/three.min.js'
+  ];
+  var i = 0;
+  var msg = document.getElementById('msg');
+
+  function fail() {
+    msg.className = 'err';
+    msg.textContent = 'Не удалось загрузить библиотеку Three.js ни с одного сервера. Проверьте интернет (или отключите блокировщик/включите VPN) и обновите страницу.';
+  }
+  function boot() {
+    try { window.bootGame(); }
+    catch (e) { msg.className = 'err'; msg.textContent = 'Ошибка запуска: ' + (e && e.message ? e.message : e); console.error(e); }
+  }
+  function next() {
+    if (typeof window.THREE !== 'undefined') { boot(); return; }
+    if (i >= urls.length) { fail(); return; }
+    var s = document.createElement('script'), finished = false;
+    var timer = setTimeout(function () { if (!finished) { finished = true; next(); } }, 10000);
+    s.onload = function () { if (finished) return; finished = true; clearTimeout(timer); if (window.THREE) boot(); else next(); };
+    s.onerror = function () { if (finished) return; finished = true; clearTimeout(timer); next(); };
+    s.src = urls[i++];
+    document.head.appendChild(s);
+  }
+  next();
+})();
+</script>
+</body>
+</html>
